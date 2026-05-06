@@ -1,0 +1,6 @@
+@WtcConnect.Api_HostAddress = http://localhost:5281
+
+GET {{WtcConnect.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
