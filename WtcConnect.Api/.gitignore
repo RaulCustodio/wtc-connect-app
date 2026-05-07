@@ -1,0 +1,5 @@
+bin/
+obj/
+.vs/
+*.user
+.github/copilot-instructions.md
