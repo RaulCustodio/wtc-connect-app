@@ -1,5 +1,7 @@
 package br.com.fiap.wtcconnect.notifications
 
+// DEPRECATED: Firebase is not used - using JWT authentication instead
+/*
 import android.content.Context
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -22,4 +24,5 @@ object FcmTokenManager {
         }
     }
 }
+*/
 

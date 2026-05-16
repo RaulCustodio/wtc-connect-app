@@ -1,5 +1,7 @@
 package br.com.fiap.wtcconnect.data.repository
 
+// DEPRECATED: This file is not used - using JWT authentication instead of Firebase Auth
+/*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import br.com.fiap.wtcconnect.viewmodel.UserType
@@ -129,4 +131,4 @@ class UserRepository {
         Result.failure(e)
     }
 }
-
+*/

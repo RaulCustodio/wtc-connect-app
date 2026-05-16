@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
@@ -139,18 +140,14 @@ fun NavigationGraph(navController: androidx.navigation.NavHostController, authVi
             GroupsScreen(navController = navController, repository = remoteChatRepo, currentUserId = authState.userId, currentUserType = authState.userType)
         }
         composable(BottomNavItem.Profile.route) {
-            ProfileScreen(
-                authViewModel = authViewModel,
-                onNavigateToChangePassword = {
-                    navController.navigate("change_password")
-                },
-                onNavigateToNotifications = {
-                    navController.navigate("notifications")
-                },
-                onNavigateToHelp = {
-                    navController.navigate("help")
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Button(onClick = { authViewModel.logout() }) {
+                    Text("Deslogar")
                 }
-            )
+            }
         }
 
         // Novas rotas para as telas de configuração

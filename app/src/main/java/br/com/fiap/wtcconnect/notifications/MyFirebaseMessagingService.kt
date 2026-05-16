@@ -1,5 +1,7 @@
 package br.com.fiap.wtcconnect.notifications
 
+// DEPRECATED: Firebase is not used - using JWT authentication instead
+/*
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -94,3 +96,4 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         return true
     }
 }
+*/

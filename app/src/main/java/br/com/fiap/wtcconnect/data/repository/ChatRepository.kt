@@ -1,5 +1,7 @@
 package br.com.fiap.wtcconnect.data.repository
 
+// DEPRECATED: This file is not used - using JWT authentication and REST API instead
+/*
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -80,3 +82,4 @@ class ChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestor
             }
     }
 }
+*/

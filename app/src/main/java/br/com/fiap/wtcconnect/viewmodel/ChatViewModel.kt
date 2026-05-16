@@ -1,5 +1,7 @@
 package br.com.fiap.wtcconnect.viewmodel
 
+// DEPRECATED: This file is not used - using REST API instead of Firebase
+/*
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -49,3 +51,4 @@ class ChatViewModel(private val chatId: String, private val repo: ChatRepository
         }
     }
 }
+*/
