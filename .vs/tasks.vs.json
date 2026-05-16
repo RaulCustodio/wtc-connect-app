@@ -1,0 +1,10 @@
+{
+  "version": "0.2.1",
+  "tasks": [
+    {
+      "taskLabel": "tarefa-build.gradle",
+      "appliesTo": "app/build.gradle.kts",
+      "type": "launch"
+    }
+  ]
+}
