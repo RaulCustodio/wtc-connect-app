@@ -21,6 +21,13 @@ namespace WtcConnect.Api.Controllers
             this.segmentService = segmentService;
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var customerList = await customerService.GetAllAsync();
+            return Ok(customerList);
+        }
+
         [HttpPost]
         public async Task<IActionResult> Register([FromBody] CreateCustomerRequest request)
         {

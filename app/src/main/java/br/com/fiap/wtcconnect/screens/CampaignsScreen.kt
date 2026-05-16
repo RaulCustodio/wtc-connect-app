@@ -1,68 +1,95 @@
 package br.com.fiap.wtcconnect.screens.campaigns
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import br.com.fiap.wtcconnect.R
-import br.com.fiap.wtcconnect.data.model.Campaign
-import br.com.fiap.wtcconnect.ui.theme.WtcCrmTheme
-
-val mockCampaigns = listOf(
-    Campaign(1, "Feirão WTC", "Até 40% de desconto para associados", "15-20 OUT", "Todos", R.drawable.desconto),
-    Campaign(2, "WTC Summit 2024", "O maior evento de networking do ano.", "25 NOV", "VIP", R.drawable.networking),
-    Campaign(3, "Happy Hour de Negócios", "Conecte-se com líderes do mercado.", "Toda Sexta", "Lead Quente", R.drawable.negocios)
-)
+import br.com.fiap.wtcconnect.AppContainer
+import br.com.fiap.wtcconnect.network.CampaignDto
+import br.com.fiap.wtcconnect.network.CustomerDto
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CampaignsScreen() {
+    val campaignRepository = remember { AppContainer.provideCampaignRepository() }
+    val customerRepository = remember { AppContainer.provideCustomerRepository() }
+    val scope = rememberCoroutineScope()
 
-    val campaigns = remember {
-        mutableStateListOf<Campaign>().apply {
-            addAll(mockCampaigns)
+    val campaigns = remember { mutableStateListOf<CampaignDto>() }
+    val customers = remember { mutableStateListOf<CustomerDto>() }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showNewCampaignDialog by remember { mutableStateOf(false) }
+
+    fun loadData() {
+        scope.launch {
+            isLoading = true
+            errorMessage = null
+            runCatching {
+                val loadedCampaigns = campaignRepository.getCampaigns()
+                val loadedCustomers = customerRepository.getCustomers()
+                campaigns.clear()
+                campaigns.addAll(loadedCampaigns)
+                customers.clear()
+                customers.addAll(loadedCustomers)
+            }.onFailure {
+                errorMessage = it.message ?: "Erro ao carregar campanhas"
+            }
+            isLoading = false
         }
     }
 
-    var showNewCampaignDialog by remember { mutableStateOf(false) }
-    var editingCampaign by remember { mutableStateOf<Campaign?>(null) }
-
-    var newTitle by remember { mutableStateOf("") }
-    var newDescription by remember { mutableStateOf("") }
-    var newDate by remember { mutableStateOf("") }
-    var newSegment by remember { mutableStateOf("Todos") }
-
-    // Preencher dados ao editar
-    LaunchedEffect(editingCampaign) {
-        editingCampaign?.let {
-            newTitle = it.title
-            newDescription = it.description
-            newDate = it.date
-            newSegment = it.segment
-        }
+    LaunchedEffect(Unit) {
+        loadData()
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Campanhas Recentes") },
+                title = { Text("Campanhas") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = Color.White
@@ -70,125 +97,95 @@ fun CampaignsScreen() {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                editingCampaign = null
-                showNewCampaignDialog = true
-            }) {
-                Icon(Icons.Default.Add, contentDescription = "Nova Campanha")
+            FloatingActionButton(onClick = { showNewCampaignDialog = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Nova campanha")
             }
         }
     ) { paddingValues ->
-
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(paddingValues)
         ) {
-            items(campaigns, key = { it.id }) { campaign ->
-                CampaignCardExpandable(
-                    campaign = campaign,
-                    onEdit = {
-                        editingCampaign = campaign
-                        showNewCampaignDialog = true
+            when {
+                isLoading -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
-                )
+                }
+
+                errorMessage != null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { loadData() }) {
+                            Text("Tentar novamente")
+                        }
+                    }
+                }
+
+                campaigns.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("Nenhuma campanha criada")
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { showNewCampaignDialog = true }) {
+                            Text("Criar campanha")
+                        }
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(campaigns, key = { it.id ?: it.name }) { campaign ->
+                            CampaignCard(campaign = campaign)
+                        }
+                    }
+                }
             }
         }
     }
 
     if (showNewCampaignDialog) {
-        AlertDialog(
-            onDismissRequest = { showNewCampaignDialog = false },
-            title = { Text(if (editingCampaign != null) "Editar Campanha" else "Nova Campanha") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-
-                    OutlinedTextField(
-                        value = newTitle,
-                        onValueChange = { newTitle = it },
-                        label = { Text("Título") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = newDescription,
-                        onValueChange = { newDescription = it },
-                        label = { Text("Descrição") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = newDate,
-                        onValueChange = { newDate = it },
-                        label = { Text("Data") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = newSegment,
-                        onValueChange = { newSegment = it },
-                        label = { Text("Segmento") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-
-                    if (newTitle.isNotBlank() && newDescription.isNotBlank() && newDate.isNotBlank()) {
-
-                        if (editingCampaign != null) {
-                            // EDITAR
-                            val index = campaigns.indexOfFirst { it.id == editingCampaign!!.id }
-
-                            if (index != -1) {
-                                campaigns[index] = Campaign(
-                                    id = editingCampaign!!.id,
-                                    title = newTitle.trim(),
-                                    description = newDescription.trim(),
-                                    date = newDate.trim(),
-                                    segment = newSegment.trim().ifBlank { "Todos" },
-                                    imageUrl = editingCampaign!!.imageUrl
-                                )
-                            }
-
-                        } else {
-                            // NOVO
-                            val nextId = (campaigns.maxOfOrNull { it.id } ?: 0) + 1
-
-                            campaigns.add(
-                                Campaign(
-                                    id = nextId,
-                                    title = newTitle.trim(),
-                                    description = newDescription.trim(),
-                                    date = newDate.trim(),
-                                    segment = newSegment.trim().ifBlank { "Todos" },
-                                    imageUrl = null
-                                )
-                            )
-                        }
-
-                        // limpar
-                        newTitle = ""
-                        newDescription = ""
-                        newDate = ""
-                        newSegment = "Todos"
-                        editingCampaign = null
+        NewCampaignDialog(
+            customers = customers,
+            onDismiss = { showNewCampaignDialog = false },
+            onSave = { name, content, customerIds ->
+                scope.launch {
+                    isLoading = true
+                    errorMessage = null
+                    runCatching {
+                        campaignRepository.createCampaign(
+                            name = name,
+                            content = content,
+                            targetCustomerIds = customerIds
+                        )
+                    }.onSuccess {
                         showNewCampaignDialog = false
+                        loadData()
+                    }.onFailure {
+                        errorMessage = it.message ?: "Erro ao criar campanha"
+                        isLoading = false
                     }
-
-                }) {
-                    Text("Salvar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    editingCampaign = null
-                    showNewCampaignDialog = false
-                }) {
-                    Text("Cancelar")
                 }
             }
         )
@@ -196,99 +193,121 @@ fun CampaignsScreen() {
 }
 
 @Composable
-fun CampaignCardExpandable(
-    campaign: Campaign,
-    onEdit: () -> Unit
-) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    var isConfirmed by rememberSaveable { mutableStateOf(false) }
-    var showMessage by remember { mutableStateOf(false) }
-
+private fun CampaignCard(campaign: CampaignDto) {
     Card(
-        elevation = CardDefaults.cardElevation(4.dp),
-        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column {
-
-            campaign.imageUrl?.let {
-                Image(
-                    painter = painterResource(id = it),
-                    contentDescription = campaign.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            Column(modifier = Modifier.padding(16.dp)) {
-
-                Text(campaign.title, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-
-                Spacer(modifier = Modifier.height(4.dp))
-
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = campaign.name,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(campaign.content, color = Color.Gray)
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.DateRange, contentDescription = null, tint = Color.Gray)
                 Text(
-                    text = "Segmento: ${campaign.segment}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.Gray
+                    text = campaign.createdAt.take(10).ifBlank { "Sem data" },
+                    color = Color.Gray,
+                    modifier = Modifier.padding(start = 6.dp)
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(campaign.description, color = Color.Gray)
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DateRange, contentDescription = null, tint = Color.Gray)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(campaign.date, color = Color.Gray)
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row {
-
-                    Button(
-                        onClick = onEdit,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Editar")
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            isConfirmed = true
-                            showMessage = true
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (isConfirmed) "Confirmado" else "Confirmar presença")
-                    }
-                }
-
-                if (expanded) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Detalhes da campanha: ${campaign.description}")
-                }
-
-                if (showMessage) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Presença confirmada!", color = Color.Green)
-                }
             }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Destinatarios: ${campaign.targetCustomerIds.size}",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.Gray
+            )
         }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun CampaignsScreenPreview() {
-    WtcCrmTheme {
-        CampaignsScreen()
-    }
+private fun NewCampaignDialog(
+    customers: List<CustomerDto>,
+    onDismiss: () -> Unit,
+    onSave: (String, String, List<String>) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
+    val selectedCustomerIds = remember { mutableStateListOf<String>() }
+    val canSave = name.isNotBlank() && content.isNotBlank() && selectedCustomerIds.isNotEmpty()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Nova campanha") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nome") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("Mensagem") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+                Text("Clientes", style = MaterialTheme.typography.labelMedium)
+                if (customers.isEmpty()) {
+                    Text("Cadastre clientes antes de criar uma campanha.", color = Color.Gray)
+                } else {
+                    LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(customers, key = { it.id ?: it.userId }) { customer ->
+                            val customerId = customer.id.orEmpty()
+                            val checked = customerId in selectedCustomerIds
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked) {
+                                            selectedCustomerIds.add(customerId)
+                                        } else {
+                                            selectedCustomerIds.remove(customerId)
+                                        }
+                                    },
+                                    enabled = customerId.isNotBlank()
+                                )
+                                Column {
+                                    Text(customer.name)
+                                    Text(customer.id.orEmpty(), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSave,
+                onClick = {
+                    onSave(
+                        name.trim(),
+                        content.trim(),
+                        selectedCustomerIds.toList()
+                    )
+                }
+            ) {
+                Text("Enviar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }

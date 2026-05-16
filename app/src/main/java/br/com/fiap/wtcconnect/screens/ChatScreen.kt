@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import br.com.fiap.wtcconnect.ui.theme.RoyalBlue
+import kotlinx.coroutines.flow.first
 
 /**
  * ChatScreen composable que exibe o histórico de mensagens para a conversationId fornecida.
@@ -58,7 +59,7 @@ fun ChatScreen(navController: NavController, conversationId: String, peerUserId:
             val userGroup = currentUserId?.let { uid -> repo.getUserGroupId(uid) }
             var gid: String? = null
             if (userGroup != null) {
-                userGroup.collect { gid = it }
+                gid = userGroup.first()
             }
             if (gid != groupId && currentUserType != br.com.fiap.wtcconnect.viewmodel.UserType.OPERATOR) {
                 authorized = false
@@ -69,10 +70,10 @@ fun ChatScreen(navController: NavController, conversationId: String, peerUserId:
             if (currentUserType == br.com.fiap.wtcconnect.viewmodel.UserType.CLIENT && currentUserId != null) {
                 val myGroup = repo.getUserGroupId(currentUserId)
                 var gid: String? = null
-                myGroup.collect { gid = it }
+                gid = myGroup.first()
                 val peerGroupFlow = repo.getUserGroupId(peerUserId)
                 var peerGid: String? = null
-                peerGroupFlow.collect { peerGid = it }
+                peerGid = peerGroupFlow.first()
                 if (gid == null || peerGid == null || gid != peerGid) {
                     authorized = false
                     authErrorMessage = "Você só pode conversar com membros do seu grupo"

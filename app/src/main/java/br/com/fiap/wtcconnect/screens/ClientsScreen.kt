@@ -1,73 +1,106 @@
 package br.com.fiap.wtcconnect.screens.clients
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import br.com.fiap.wtcconnect.AppContainer
+import br.com.fiap.wtcconnect.network.CustomerDto
 import br.com.fiap.wtcconnect.ui.theme.AccentGreen
-import br.com.fiap.wtcconnect.ui.theme.WtcCrmTheme
-import br.com.fiap.wtcconnect.data.model.Client
-
-val mockClients = listOf(
-    Client(1, "Empresa Alpha", "Ativo", listOf("VIP", "Lead Quente"), 95),
-    Client(2, "Soluções Beta", "Inativo", listOf("Ex-cliente"), 30),
-    Client(3, "Inovações Gamma", "Em prospecção", listOf("Follow-up"), 70),
-    Client(4, "Tech Delta", "Ativo", listOf("Contrato Anual"), 88)
-)
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClientsScreen(
-    onOpenChat: (Client) -> Unit // 🔥 ADICIONADO
+    onOpenChat: (CustomerDto) -> Unit
 ) {
+    val customerRepository = remember { AppContainer.provideCustomerRepository() }
+    val scope = rememberCoroutineScope()
+    val customers = remember { mutableStateListOf<CustomerDto>() }
     var searchQuery by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showNewClientDialog by remember { mutableStateOf(false) }
 
-    val clients = remember {
-        mutableStateListOf<Client>().apply {
-            addAll(mockClients)
+    fun loadCustomers() {
+        scope.launch {
+            isLoading = true
+            errorMessage = null
+            runCatching {
+                customerRepository.getCustomers()
+            }.onSuccess { loaded ->
+                customers.clear()
+                customers.addAll(loaded)
+            }.onFailure {
+                errorMessage = it.message ?: "Erro ao carregar clientes"
+            }
+            isLoading = false
         }
     }
 
-    val allStatuses = listOf("Ativo", "Inativo", "Em prospecção")
-    val allTags = remember(clients.size) { clients.flatMap { it.tags }.distinct() }
+    LaunchedEffect(Unit) {
+        loadCustomers()
+    }
 
-    var selectedStatuses by remember { mutableStateOf(setOf<String>()) }
-    var selectedTags by remember { mutableStateOf(setOf<String>()) }
-    var minScore by remember { mutableStateOf(0f) }
-
-    val notesByClient = remember { mutableStateMapOf<Int, SnapshotStateList<String>>() }
-    var showNoteDialogFor by remember { mutableStateOf<Int?>(null) }
-    var noteText by remember { mutableStateOf("") }
-
-    var showNewClientDialog by remember { mutableStateOf(false) }
-    var newClientName by remember { mutableStateOf("") }
-    var newClientStatus by remember { mutableStateOf("Ativo") }
-    var newClientTags by remember { mutableStateOf("") }
-    var newClientScore by remember { mutableStateOf("0") }
-
-    val filtered = remember(searchQuery, selectedStatuses, selectedTags, minScore, clients.size) {
-        clients.filter { client ->
-            val matchesQuery = client.name.contains(searchQuery, ignoreCase = true)
-            val matchesStatus = selectedStatuses.isEmpty() || client.status in selectedStatuses
-            val matchesTags = selectedTags.isEmpty() || selectedTags.all { it in client.tags }
-            val matchesScore = client.score >= minScore.toInt()
-            matchesQuery && matchesStatus && matchesTags && matchesScore
+    val filtered = remember(searchQuery, customers.size) {
+        val query = searchQuery.trim()
+        if (query.isBlank()) {
+            customers.toList()
+        } else {
+            customers.filter {
+                it.name.contains(query, ignoreCase = true) ||
+                    it.phone.contains(query, ignoreCase = true) ||
+                    it.address.contains(query, ignoreCase = true)
+            }
         }
     }
 
@@ -83,212 +116,104 @@ fun ClientsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showNewClientDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Novo Cliente")
+                Icon(Icons.Default.Add, contentDescription = "Novo cliente")
             }
         }
     ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                placeholder = { Text("Buscar cliente") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true
+            )
 
-            // 🔎 BUSCA + FILTROS (sem alteração)
-            Column(modifier = Modifier.padding(16.dp)) {
-                TextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Buscar cliente...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Status", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    allStatuses.forEach { status ->
-                        val selected = status in selectedStatuses
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                selectedStatuses = selectedStatuses.toMutableSet().apply {
-                                    if (selected) remove(status) else add(status)
-                                }
-                            },
-                            label = { Text(status) }
-                        )
+            when {
+                isLoading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Tags", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    allTags.forEach { tag ->
-                        val selected = tag in selectedTags
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                selectedTags = selectedTags.toMutableSet().apply {
-                                    if (selected) remove(tag) else add(tag)
-                                }
-                            },
-                            label = { Text(tag) }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Score mínimo: ${minScore.toInt()}", color = Color.Gray)
-
-                Slider(
-                    value = minScore,
-                    onValueChange = { minScore = it },
-                    valueRange = 0f..100f
-                )
-            }
-
-            // 📋 LISTA DE CLIENTES
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filtered, key = { it.id }) { client ->
-                    val noteCount = notesByClient[client.id]?.size ?: 0
-
-                    ClientListItem(
-                        client = client,
-                        noteCount = noteCount,
-                        onAddNote = {
-                            showNoteDialogFor = client.id
-                        },
-
-                        // 🔥 AQUI ESTÁ A CORREÇÃO DO CHAT
-                        onNewMessage = {
-                            onOpenChat(client)
+                errorMessage != null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { loadCustomers() }) {
+                            Text("Tentar novamente")
                         }
-                    )
+                    }
+                }
+
+                filtered.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("Nenhum cliente encontrado")
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { showNewClientDialog = true }) {
+                            Text("Cadastrar cliente")
+                        }
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filtered, key = { it.id ?: it.userId }) { customer ->
+                            ClientListItem(
+                                customer = customer,
+                                onOpenChat = { onOpenChat(customer) }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
-    if (showNoteDialogFor != null) {
-        AlertDialog(
-            onDismissRequest = {
-                showNoteDialogFor = null
-                noteText = ""
-            },
-            title = { Text("Nova anotação") },
-            text = {
-                OutlinedTextField(
-                    value = noteText,
-                    onValueChange = { noteText = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Digite uma anotação rápida...") }
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val id = showNoteDialogFor
-                    if (id != null && noteText.isNotBlank()) {
-                        val list = notesByClient.getOrPut(id) { mutableStateListOf() }
-                        list.add(noteText.trim())
-                    }
-                    noteText = ""
-                    showNoteDialogFor = null
-                }) {
-                    Text("Salvar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showNoteDialogFor = null
-                    noteText = ""
-                }) {
-                    Text("Cancelar")
-                }
-            }
-        )
-    }
-
     if (showNewClientDialog) {
-        AlertDialog(
-            onDismissRequest = { showNewClientDialog = false },
-            title = { Text("Novo Cliente") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = newClientName,
-                        onValueChange = { newClientName = it },
-                        label = { Text("Nome") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = newClientStatus,
-                        onValueChange = { newClientStatus = it },
-                        label = { Text("Status") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = newClientTags,
-                        onValueChange = { newClientTags = it },
-                        label = { Text("Tags (separadas por vírgula)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = newClientScore,
-                        onValueChange = { newClientScore = it },
-                        label = { Text("Score") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (newClientName.isNotBlank()) {
-                        val nextId = (clients.maxOfOrNull { it.id } ?: 0) + 1
-                        clients.add(
-                            Client(
-                                id = nextId,
-                                name = newClientName.trim(),
-                                status = newClientStatus.trim().ifBlank { "Ativo" },
-                                tags = newClientTags
-                                    .split(",")
-                                    .map { it.trim() }
-                                    .filter { it.isNotBlank() },
-                                score = newClientScore.toIntOrNull() ?: 0
-                            )
+        NewClientDialog(
+            onDismiss = { showNewClientDialog = false },
+            onSave = { userId, name, phone, address, segmentId ->
+                scope.launch {
+                    isLoading = true
+                    errorMessage = null
+                    runCatching {
+                        customerRepository.createCustomer(
+                            userId = userId.ifBlank { "manual-${System.currentTimeMillis()}" },
+                            name = name,
+                            phone = phone,
+                            address = address,
+                            segmentId = segmentId.takeIf { it.isNotBlank() }
                         )
-
-                        newClientName = ""
-                        newClientStatus = "Ativo"
-                        newClientTags = ""
-                        newClientScore = "0"
+                    }.onSuccess {
                         showNewClientDialog = false
+                        loadCustomers()
+                    }.onFailure {
+                        errorMessage = it.message ?: "Erro ao cadastrar cliente"
+                        isLoading = false
                     }
-                }) {
-                    Text("Salvar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNewClientDialog = false }) {
-                    Text("Cancelar")
                 }
             }
         )
@@ -296,13 +221,16 @@ fun ClientsScreen(
 }
 
 @Composable
-fun ClientListItem(
-    client: Client,
-    noteCount: Int,
-    onAddNote: () -> Unit,
-    onNewMessage: () -> Unit
+private fun ClientListItem(
+    customer: CustomerDto,
+    onOpenChat: () -> Unit
 ) {
-    Card(elevation = CardDefaults.cardElevation(2.dp)) {
+    Card(
+        elevation = CardDefaults.cardElevation(2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenChat)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -313,65 +241,112 @@ fun ClientListItem(
                 modifier = Modifier
                     .size(10.dp)
                     .clip(CircleShape)
-                    .background(if (client.status == "Ativo") AccentGreen else Color.Gray)
+                    .background(AccentGreen)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(client.name, fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(client.status, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Score ${client.score}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                }
-                Row {
-                    client.tags.forEach { tag ->
-                        Chip(label = tag)
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                }
+                Text(
+                    customer.name,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    customer.phone.ifBlank { "Sem telefone" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+                Text(
+                    customer.address.ifBlank { "Sem endereco" },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    customer.id.orEmpty(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            IconButton(onClick = onNewMessage) {
-                Icon(Icons.Default.Message, contentDescription = "Nova Mensagem")
-            }
-            BadgedBox(
-                badge = {
-                    if (noteCount > 0) {
-                        Badge { Text(noteCount.toString()) }
-                    }
-                }
-            ) {
-                IconButton(onClick = onAddNote) {
-                    Icon(Icons.Default.NoteAdd, contentDescription = "Adicionar Anotação")
-                }
+            IconButton(onClick = onOpenChat) {
+                Icon(Icons.AutoMirrored.Filled.Message, contentDescription = "Abrir chat")
             }
         }
     }
 }
 
 @Composable
-fun Chip(label: String) {
-    Box(
-        modifier = Modifier
-            .background(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                RoundedCornerShape(50)
-            )
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.labelSmall
-        )
-    }
-}
+private fun NewClientDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, String, String) -> Unit
+) {
+    var userId by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var segmentId by remember { mutableStateOf("") }
+    val canSave = name.isNotBlank()
 
-@Preview(showBackground = true)
-@Composable
-fun ClientsScreenPreview() {
-    WtcCrmTheme {
-        ClientsScreen(
-            onOpenChat = {}
-        )
-    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Novo cliente") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nome") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Telefone") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("Endereco") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = userId,
+                    onValueChange = { userId = it },
+                    label = { Text("UserId vinculado (opcional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = segmentId,
+                    onValueChange = { segmentId = it },
+                    label = { Text("SegmentId (opcional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSave,
+                onClick = {
+                    onSave(
+                        userId.trim(),
+                        name.trim(),
+                        phone.trim(),
+                        address.trim(),
+                        segmentId.trim()
+                    )
+                }
+            ) {
+                Text("Salvar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }

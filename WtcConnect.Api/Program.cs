@@ -4,12 +4,16 @@ using WtcConnect.Api.Hubs;
 using MongoDB.Driver;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 // Config Mongo (appsettings.json)
 builder.Services.Configure<MongoDbSettings>(
@@ -32,6 +36,7 @@ builder.Services.AddSingleton<MessageService>();
 builder.Services.AddSingleton<CampaignService>();
 builder.Services.AddSingleton<CustomerService>();
 builder.Services.AddSingleton<SegmentService>();
+builder.Services.AddSingleton<GroupService>();
 builder.Services.AddSignalR();
 
 // CONFIG JWT 
@@ -70,6 +75,10 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        Path.Combine(builder.Environment.ContentRootPath, ".aspnet-data-protection-keys")));
 
 // Controllers + Swagger
 builder.Services.AddControllers()

@@ -49,6 +49,14 @@ class SignalRManager(
         connection?.send("LeaveCustomerInbox", customerId)
     }
 
+    suspend fun joinGroupChat(groupId: String) = withContext(Dispatchers.IO) {
+        connection?.send("JoinGroupChat", groupId)
+    }
+
+    suspend fun leaveGroupChat(groupId: String) = withContext(Dispatchers.IO) {
+        connection?.send("LeaveGroupChat", groupId)
+    }
+
     suspend fun stop() = withContext(Dispatchers.IO) {
         connection?.stop()?.blockingAwait()
         connection = null

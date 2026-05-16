@@ -7,8 +7,13 @@ import br.com.fiap.wtcconnect.data.Message
 import br.com.fiap.wtcconnect.data.MessageStatus
 import br.com.fiap.wtcconnect.data.User
 import br.com.fiap.wtcconnect.data.auth.SessionManager
+import br.com.fiap.wtcconnect.network.AddGroupMemberRequest
+import br.com.fiap.wtcconnect.network.GroupApi
+import br.com.fiap.wtcconnect.network.GroupDto
+import br.com.fiap.wtcconnect.network.GroupMemberDto
 import br.com.fiap.wtcconnect.network.MessageApi
 import br.com.fiap.wtcconnect.network.MessageDto
+import br.com.fiap.wtcconnect.network.SendGroupMessageRequest
 import br.com.fiap.wtcconnect.network.SendMessageRequest
 import br.com.fiap.wtcconnect.network.UpdateMessageStatusRequest
 import br.com.fiap.wtcconnect.realtime.SignalRManager
@@ -18,12 +23,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.time.Instant
 
 class RemoteChatRepository(
     private val messageApi: MessageApi,
+    private val groupApi: GroupApi,
     private val sessionManager: SessionManager,
     private val signalRManager: SignalRManager
 ) : ChatRepository {
@@ -31,6 +37,7 @@ class RemoteChatRepository(
     private val conversations = MutableStateFlow<List<Conversation>>(emptyList())
     private val messageFlows = mutableMapOf<String, MutableStateFlow<List<Message>>>()
     private val joinedCustomerIds = mutableSetOf<String>()
+    private val joinedGroupIds = mutableSetOf<String>()
     private var realtimeStarted = false
 
     override fun getConversations(): Flow<List<Conversation>> {
@@ -45,13 +52,23 @@ class RemoteChatRepository(
 
         scope.launch {
             runCatching {
-                joinInbox(conversationId)
-                val messages = messageApi.getInbox(conversationId)
+                val messages = if (conversationId.startsWith("group_")) {
+                    val groupId = conversationId.removePrefix("group_")
+                    joinGroup(groupId)
+                    groupApi.getGroupMessages(groupId)
+                } else {
+                    joinInbox(conversationId)
+                    messageApi.getInbox(conversationId)
+                }
                     .map { it.toDomain() }
                     .sortedBy { it.createdAt }
+
                 flow.value = messages
                 upsertConversation(conversationId, messages)
-                markIncomingMessagesAsRead(messages)
+
+                if (!conversationId.startsWith("group_")) {
+                    markIncomingMessagesAsRead(messages)
+                }
             }
         }
 
@@ -60,42 +77,100 @@ class RemoteChatRepository(
 
     override suspend fun sendMessage(conversationId: String, content: String, senderId: String): Result<Unit> {
         return runCatching {
-            val message = messageApi.sendMessage(
-                SendMessageRequest(
-                    customerId = conversationId,
-                    content = content
+            val message = if (conversationId.startsWith("group_")) {
+                val groupId = conversationId.removePrefix("group_")
+                groupApi.sendGroupMessage(groupId, SendGroupMessageRequest(content = content))
+            } else {
+                messageApi.sendMessage(
+                    SendMessageRequest(
+                        customerId = conversationId,
+                        content = content
+                    )
                 )
-            ).toDomain()
+            }.toDomain()
 
             upsertMessage(message)
         }
     }
 
-    override fun getGroups(): Flow<List<Group>> = flowOf(listOf(Group(id = "g0", name = "WTC Connect")))
+    override fun getGroups(): Flow<List<Group>> {
+        val flow = MutableStateFlow<List<Group>>(emptyList())
+        scope.launch {
+            runCatching {
+                groupApi.getGroups().map { it.toDomain() }
+            }.onSuccess {
+                flow.value = it
+            }
+        }
+        return flow.asStateFlow()
+    }
 
-    override fun getGroupMembers(groupId: String): Flow<List<User>> = flowOf(emptyList())
+    override fun getGroupMembers(groupId: String): Flow<List<User>> {
+        val flow = MutableStateFlow<List<User>>(emptyList())
+        scope.launch {
+            runCatching {
+                groupApi.getGroupMembers(groupId).map { it.toDomainUser() }
+            }.onSuccess {
+                flow.value = it
+            }
+        }
+        return flow.asStateFlow()
+    }
 
     override suspend fun addUserToGroupByEmail(groupId: String, userEmail: String): Result<Unit> {
-        return Result.failure(UnsupportedOperationException("Grupos ainda usam a implementação local"))
+        return runCatching {
+            groupApi.addGroupMember(groupId, AddGroupMemberRequest(email = userEmail))
+            Unit
+        }
     }
 
     override suspend fun removeUserFromGroup(groupId: String, userId: String): Result<Unit> {
-        return Result.failure(UnsupportedOperationException("Grupos ainda usam a implementação local"))
+        return runCatching {
+            groupApi.removeGroupMember(groupId, userId)
+            Unit
+        }
     }
 
-    override fun searchUsers(query: String, withinGroupId: String?): Flow<List<User>> = flowOf(emptyList())
+    override fun searchUsers(query: String, withinGroupId: String?): Flow<List<User>> {
+        val flow = MutableStateFlow<List<User>>(emptyList())
+        scope.launch {
+            runCatching {
+                groupApi.searchUsers(query, withinGroupId).map { it.toDomainUser() }
+            }.onSuccess {
+                flow.value = it
+            }
+        }
+        return flow.asStateFlow()
+    }
 
-    override fun getUserGroupId(userId: String): Flow<String?> = flowOf("g0")
+    override fun getUserGroupId(userId: String): Flow<String?> {
+        return flow {
+            emit(
+                runCatching {
+                    groupApi.getUserGroup(userId).groupId
+                }.getOrNull()
+            )
+        }
+    }
 
     override fun getUserById(userId: String): Flow<User?> {
-        val session = sessionManager.getSession()
-        val user = if (session != null && userId == session.userId) {
-            User(id = session.userId, name = session.email.substringBefore('@'), email = session.email)
-        } else {
-            User(id = userId, name = "WTC Connect", email = null)
-        }
+        val flow = MutableStateFlow<User?>(null)
+        scope.launch {
+            val session = sessionManager.getSession()
+            if (session != null && userId == session.userId) {
+                flow.value = User(id = session.userId, name = session.email.substringBefore('@'), email = session.email)
+                return@launch
+            }
 
-        return flowOf(user)
+            runCatching {
+                groupApi.getUser(userId).toDomainUser()
+            }.onSuccess {
+                flow.value = it
+            }.onFailure {
+                flow.value = User(id = userId, name = "WTC Connect", email = null)
+            }
+        }
+        return flow.asStateFlow()
     }
 
     private fun refreshCurrentUserConversation() {
@@ -131,6 +206,12 @@ class RemoteChatRepository(
         }
     }
 
+    private suspend fun joinGroup(groupId: String) {
+        if (joinedGroupIds.add(groupId)) {
+            signalRManager.joinGroupChat(groupId)
+        }
+    }
+
     private fun upsertMessage(message: Message) {
         val flow = messageFlows.getOrPut(message.customerId) { MutableStateFlow(emptyList()) }
         val updated = flow.value
@@ -163,6 +244,7 @@ class RemoteChatRepository(
         val session = sessionManager.getSession()
         val isCurrentUserConversation = session?.userId == customerId
         val name = when {
+            customerId.startsWith("group_") -> "Grupo"
             isCurrentUserConversation -> "WTC Connect"
             lastMessage?.senderRole == "Operator" -> "Operador"
             else -> "Cliente $customerId"
@@ -191,6 +273,21 @@ class RemoteChatRepository(
             }
         }
     }
+}
+
+private fun GroupDto.toDomain(): Group {
+    return Group(
+        id = id.orEmpty(),
+        name = name
+    )
+}
+
+private fun GroupMemberDto.toDomainUser(): User {
+    return User(
+        id = userId,
+        name = name.ifBlank { email?.substringBefore('@') ?: userId },
+        email = email
+    )
 }
 
 private fun MessageDto.toDomain(): Message {

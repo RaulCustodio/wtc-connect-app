@@ -111,9 +111,6 @@ fun BottomNavigationBar(navController: NavController, items: List<BottomNavItem>
 @Composable
 fun NavigationGraph(navController: androidx.navigation.NavHostController, authViewModel: AuthViewModel) {
     val authState by authViewModel.authState.collectAsState()
-    val fakeGroupRepo = remember(authState.userId, authState.userEmail) {
-        br.com.fiap.wtcconnect.data.FakeChatRepository(currentUserId = authState.userId ?: "me", currentUserEmail = authState.userEmail)
-    }
     val remoteChatRepo = remember(authState.userId, authState.token) {
         AppContainer.provideChatRepository()
     }
@@ -129,16 +126,17 @@ fun NavigationGraph(navController: androidx.navigation.NavHostController, authVi
         }
         composable("group_chat/{groupId}") { backStackEntry ->
             val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
-            ChatScreen(navController = navController, conversationId = "group_$groupId", peerUserId = "group:$groupId", repository = fakeGroupRepo, currentUserId = authState.userId, currentUserType = authState.userType)
+            ChatScreen(navController = navController, conversationId = "group_$groupId", peerUserId = "group:$groupId", repository = remoteChatRepo, currentUserId = authState.userId, currentUserType = authState.userType)
         }
         composable(BottomNavItem.Campaigns.route) { CampaignsScreen() }
         composable(BottomNavItem.Clients.route) { ClientsScreen(
-            onOpenChat = { client ->
-                navController.navigate("chat/${client.id}/${client.id}")
+            onOpenChat = { customer ->
+                val customerId = customer.id ?: customer.userId
+                navController.navigate("chat/$customerId/$customerId")
             }
         ) }
         composable(BottomNavItem.Groups.route) {
-            GroupsScreen(navController = navController, repository = fakeGroupRepo, currentUserId = authState.userId, currentUserType = authState.userType)
+            GroupsScreen(navController = navController, repository = remoteChatRepo, currentUserId = authState.userId, currentUserType = authState.userType)
         }
         composable(BottomNavItem.Profile.route) {
             ProfileScreen(

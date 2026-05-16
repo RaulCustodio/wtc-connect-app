@@ -8,6 +8,8 @@ namespace WtcConnect.Api.Hubs;
 public class ChatHub : Hub
 {
     public static string GetCustomerGroup(string customerId) => $"customer:{customerId}";
+    public static string GetSignalRGroup(string groupId) => $"group:{groupId}";
+    public static string GetGroupConversationId(string groupId) => $"group_{groupId}";
 
     public override async Task OnConnectedAsync()
     {
@@ -39,5 +41,25 @@ public class ChatHub : Hub
         }
 
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetCustomerGroup(customerId));
+    }
+
+    public async Task JoinGroupChat(string groupId)
+    {
+        if (string.IsNullOrWhiteSpace(groupId))
+        {
+            return;
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, GetSignalRGroup(groupId));
+    }
+
+    public async Task LeaveGroupChat(string groupId)
+    {
+        if (string.IsNullOrWhiteSpace(groupId))
+        {
+            return;
+        }
+
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetSignalRGroup(groupId));
     }
 }

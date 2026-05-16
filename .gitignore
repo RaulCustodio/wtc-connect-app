@@ -20,6 +20,7 @@ bin/
 obj/
 WtcConnect.Api/bin/
 WtcConnect.Api/obj/
+.aspnet-data-protection-keys/
 
 # Local machine configuration
 local.properties

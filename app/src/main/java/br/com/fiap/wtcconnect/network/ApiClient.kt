@@ -37,4 +37,16 @@ object ApiClient {
     fun createMessageApi(sessionManager: SessionManager): MessageApi {
         return createRetrofit(sessionManager, withAuth = true).create(MessageApi::class.java)
     }
+
+    fun createCampaignApi(sessionManager: SessionManager): CampaignApi {
+        return createRetrofit(sessionManager, withAuth = true).create(CampaignApi::class.java)
+    }
+
+    fun createCustomerApi(sessionManager: SessionManager): CustomerApi {
+        return createRetrofit(sessionManager, withAuth = true).create(CustomerApi::class.java)
+    }
+
+    fun createGroupApi(sessionManager: SessionManager): GroupApi {
+        return createRetrofit(sessionManager, withAuth = true).create(GroupApi::class.java)
+    }
 }

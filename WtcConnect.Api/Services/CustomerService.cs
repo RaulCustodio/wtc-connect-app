@@ -25,6 +25,14 @@ public class CustomerService
         return customer;
     }
 
+    public async Task<List<Customer>> GetAllAsync()
+    {
+        return await customers
+            .Find(_ => true)
+            .SortByDescending(c => c.LastActionAt)
+            .ToListAsync();
+    }
+
     public async Task<Customer?> GetByIdAsync(string id)
     {
         return await customers.Find(c => c.Id == id).FirstOrDefaultAsync();
