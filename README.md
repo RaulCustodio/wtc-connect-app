@@ -32,6 +32,16 @@ O projeto usa app/google-services.json. Verifique se o arquivo existe e correspo
 
 - Ou use o Run do Android Studio para executar em emulador/dispositivo.
 
+## API local no app Android
+Por padrão, o app usa `http://10.0.2.2:5281/`, que funciona no emulador Android para acessar a API rodando no computador.
+
+Para testar em um celular físico na mesma rede Wi-Fi:
+- suba a API com o perfil de rede local:
+  `dotnet run --project WtcConnect.Api --launch-profile lan-http`
+- descubra o IP do computador na rede, por exemplo `192.168.0.10`
+- compile/instale o app informando esse IP:
+  `.\gradlew.bat installDebug -PapiBaseUrl=http://192.168.0.10:5281/`
+
 ## Testes
 - Unit tests:
   .\gradlew.bat testDebugUnitTest

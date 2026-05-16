@@ -6,6 +6,13 @@ plugins {
     id("com.android.application")
 }
 
+fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val apiBaseUrl = (findProperty("apiBaseUrl") as String?) ?: "http://10.0.2.2:5281/"
+val signalrHubUrl = (findProperty("signalrHubUrl") as String?)
+    ?: "${apiBaseUrl.trimEnd('/')}/chat"
+
 android {
     namespace = "br.com.fiap.wtcconnect"
     compileSdk = 34
@@ -21,6 +28,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        buildConfigField("String", "API_BASE_URL", apiBaseUrl.asBuildConfigString())
+        buildConfigField("String", "SIGNALR_HUB_URL", signalrHubUrl.asBuildConfigString())
     }
 
     buildTypes {
@@ -41,6 +51,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.kotlinCompilerExtension.get()

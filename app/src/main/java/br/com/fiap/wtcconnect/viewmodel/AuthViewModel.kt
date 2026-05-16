@@ -6,10 +6,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.fiap.wtcconnect.AppContainer
 import br.com.fiap.wtcconnect.data.auth.AuthRepository
+import com.google.gson.JsonParser
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 
 data class AuthState(
     val isLoading: Boolean = false,
@@ -82,7 +85,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { throwable ->
                 _authState.value = _authState.value.copy(
                     isLoading = false,
-                    errorMessage = throwable.message ?: "Erro ao fazer login"
+                    errorMessage = throwable.toAuthMessage("Erro ao fazer login")
                 )
             }
         }
@@ -135,7 +138,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { throwable ->
                 _authState.value = _authState.value.copy(
                     isLoading = false,
-                    errorMessage = throwable.message ?: "Erro ao criar conta"
+                    errorMessage = throwable.toAuthMessage("Erro ao criar conta")
                 )
             }
         }
@@ -148,4 +151,31 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun String.toUserType(): UserType {
     return if (equals("Operator", ignoreCase = true)) UserType.OPERATOR else UserType.CLIENT
+}
+
+private fun Throwable.toAuthMessage(defaultMessage: String): String {
+    return when (this) {
+        is HttpException -> {
+            val apiMessage = response()?.errorBody()?.string()?.extractApiMessage()
+            apiMessage ?: when (code()) {
+                400 -> "Dados inválidos para cadastro"
+                401 -> "E-mail ou senha inválidos"
+                409 -> "Usuário já existe"
+                else -> "$defaultMessage (${code()})"
+            }
+        }
+
+        is IOException -> "Não foi possível conectar à API. Verifique se ela está rodando e se a URL do app está correta."
+        else -> localizedMessage ?: defaultMessage
+    }
+}
+
+private fun String.extractApiMessage(): String? {
+    return runCatching {
+        JsonParser.parseString(this)
+            .asJsonObject
+            .get("message")
+            ?.asString
+            ?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 }

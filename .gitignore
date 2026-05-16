@@ -1,3 +1,25 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+
+# IDE/local workspace
+.idea/
+.vscode/
+.vs/
+*.iml
+*.user
+*.suo
+
+# Gradle/Android local output
+.gradle/
+build/
+app/build/
+
+# .NET local output
+bin/
+obj/
+WtcConnect.Api/bin/
+WtcConnect.Api/obj/
+
+# Local machine configuration
+local.properties
