@@ -75,8 +75,9 @@ fun CampaignsScreen() {
                 campaigns.addAll(loadedCampaigns)
                 customers.clear()
                 customers.addAll(loadedCustomers)
-            }.onFailure {
-                errorMessage = it.message ?: "Erro ao carregar campanhas"
+            }.onFailure { ex ->
+                ex.printStackTrace()
+                errorMessage = ex.message ?: "Erro ao carregar campanhas"
             }
             isLoading = false
         }

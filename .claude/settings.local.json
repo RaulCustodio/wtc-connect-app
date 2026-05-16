@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Process -Name \"WtcConnect.Api\" -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

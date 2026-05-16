@@ -31,7 +31,7 @@ import br.com.fiap.wtcconnect.viewmodel.UserType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GroupsScreen(navController: NavController, repository: ChatRepository, currentUserId: String?, currentUserType: UserType) {
+fun GroupsScreen(navController: NavController, repository: ChatRepository, currentUserId: String?, currentUserType: UserType = UserType.CLIENT) {
     val groups by produceState(initialValue = emptyList<Group>(), key1 = repository) {
         try {
             repository.getGroups().collect { value = it }
@@ -170,8 +170,7 @@ fun GroupsScreen(navController: NavController, repository: ChatRepository, curre
                                     Row(modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        // Avatar iniciais
-                                        val initials = user.name.firstOrNull()?.toString() ?: user.email?.firstOrNull()?.toString() ?: "U"
+                                        val initials = (user.name.takeIf { it.isNotEmpty() }?.firstOrNull() ?: user.email?.firstOrNull() ?: 'U').toString().uppercase()
                                         Box(modifier = Modifier
                                             .size(36.dp)
                                             .clip(CircleShape)
@@ -180,7 +179,7 @@ fun GroupsScreen(navController: NavController, repository: ChatRepository, curre
                                         }
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column {
-                                            Text(user.name, fontWeight = FontWeight.Medium)
+                                            Text(user.name.takeIf { it.isNotEmpty() } ?: "Usuário", fontWeight = FontWeight.Medium)
                                             Text(user.email ?: "sem e-mail", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                                         }
                                     }

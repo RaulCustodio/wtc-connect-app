@@ -100,6 +100,9 @@ class RemoteChatRepository(
                 groupApi.getGroups().map { it.toDomain() }
             }.onSuccess {
                 flow.value = it
+            }.onFailure { ex ->
+                ex.printStackTrace()
+                flow.value = emptyList()
             }
         }
         return flow.asStateFlow()
@@ -112,6 +115,9 @@ class RemoteChatRepository(
                 groupApi.getGroupMembers(groupId).map { it.toDomainUser() }
             }.onSuccess {
                 flow.value = it
+            }.onFailure { ex ->
+                ex.printStackTrace()
+                flow.value = emptyList()
             }
         }
         return flow.asStateFlow()
@@ -138,6 +144,9 @@ class RemoteChatRepository(
                 groupApi.searchUsers(query, withinGroupId).map { it.toDomainUser() }
             }.onSuccess {
                 flow.value = it
+            }.onFailure { ex ->
+                ex.printStackTrace()
+                flow.value = emptyList()
             }
         }
         return flow.asStateFlow()

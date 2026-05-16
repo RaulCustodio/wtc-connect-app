@@ -1,5 +1,8 @@
 // C:/Users/raulc/OneDrive/Documentos/GitHub/wtc-connect-app/app/build.gradle.kts
 
+import java.util.Properties
+import java.io.File
+
 plugins {
     alias(libs.plugins.kotlin.android)
     // alias(libs.plugins.kotlin.compose)
@@ -9,9 +12,21 @@ plugins {
 fun String.asBuildConfigString(): String =
     "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
-val apiBaseUrl = (findProperty("apiBaseUrl") as String?) ?: "http://10.0.2.2:5281/"
-val signalrHubUrl = (findProperty("signalrHubUrl") as String?)
-    ?: "${apiBaseUrl.trimEnd('/')}/chat"
+// Lê de local.properties ou usa defaults
+val localProperties = Properties().apply {
+    val file = File(rootDir, "local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+val apiBaseUrl = (localProperties.getProperty("api.base.url")
+    ?: findProperty("apiBaseUrl")?.toString()
+    ?: "http://localhost:5281/")
+
+val signalrHubUrl = (localProperties.getProperty("signalr.hub.url")
+    ?: findProperty("signalrHubUrl")?.toString()
+    ?: "${apiBaseUrl.trimEnd('/')}/chat")
 
 android {
     namespace = "br.com.fiap.wtcconnect"

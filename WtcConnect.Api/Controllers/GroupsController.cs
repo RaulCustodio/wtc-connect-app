@@ -30,6 +30,13 @@ public class GroupsController : ControllerBase
         _hubContext = hubContext;
     }
 
+    [AllowAnonymous]
+    [HttpGet("status")]
+    public IActionResult Status()
+    {
+        return Ok(new { status = "API running" });
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -47,6 +54,33 @@ public class GroupsController : ControllerBase
 
         var group = await _groupService.CreateAsync(request.Name.Trim());
         return Ok(group);
+    }
+
+    [HttpGet("users/search")]
+    public async Task<IActionResult> SearchUsers([FromQuery] string query = "", [FromQuery] string? groupId = null)
+    {
+        var users = await _groupService.SearchUsersAsync(query, groupId);
+        return Ok(users);
+    }
+
+    [HttpGet("users/{userId}/group")]
+    public async Task<IActionResult> GetUserGroup(string userId)
+    {
+        var groupId = await _groupService.GetUserGroupIdAsync(userId);
+        return Ok(new { groupId });
+    }
+
+    [HttpGet("users/{userId}")]
+    public async Task<IActionResult> GetUser(string userId)
+    {
+        var member = await _groupService.GetUserAsync(userId);
+
+        if (member is not null)
+        {
+            return Ok(member);
+        }
+
+        return NotFound(new { message = "Usuário não encontrado em grupos" });
     }
 
     [HttpGet("{groupId}/members")]
@@ -93,33 +127,6 @@ public class GroupsController : ControllerBase
         }
 
         return Ok(removed);
-    }
-
-    [HttpGet("users/{userId}/group")]
-    public async Task<IActionResult> GetUserGroup(string userId)
-    {
-        var groupId = await _groupService.GetUserGroupIdAsync(userId);
-        return Ok(new { groupId });
-    }
-
-    [HttpGet("users/{userId}")]
-    public async Task<IActionResult> GetUser(string userId)
-    {
-        var member = await _groupService.GetUserAsync(userId);
-
-        if (member is not null)
-        {
-            return Ok(member);
-        }
-
-        return NotFound(new { message = "Usuário não encontrado em grupos" });
-    }
-
-    [HttpGet("users/search")]
-    public async Task<IActionResult> SearchUsers([FromQuery] string query = "", [FromQuery] string? groupId = null)
-    {
-        var users = await _groupService.SearchUsersAsync(query, groupId);
-        return Ok(users);
     }
 
     [HttpGet("{groupId}/messages")]

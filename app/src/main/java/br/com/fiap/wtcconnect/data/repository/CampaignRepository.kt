@@ -16,12 +16,17 @@ class CampaignRepository(
         content: String,
         targetCustomerIds: List<String>
     ): CampaignDto {
-        return campaignApi.createCampaign(
+        val response = campaignApi.createCampaign(
             CreateCampaignRequest(
                 name = name,
                 content = content,
                 targetCustomerIds = targetCustomerIds
             )
-        ).campaign
+        )
+        return response.campaign ?: CampaignDto(
+            name = name,
+            content = content,
+            targetCustomerIds = targetCustomerIds
+        )
     }
 }
