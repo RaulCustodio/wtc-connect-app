@@ -1,0 +1,15 @@
+.git
+.github
+.gradle
+.idea
+.vs
+app
+build
+docs
+submission
+wtc-connect-app-main
+**/bin
+**/obj
+**/*.user
+**/*.suo
+local.properties

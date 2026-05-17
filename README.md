@@ -93,6 +93,12 @@ dotnet run --project .\WtcConnect.Api\WtcConnect.Api.csproj
 ## API local no app Android
 Por padrão, o app usa `http://10.0.2.2:5281/`, que funciona no emulador Android para acessar a API rodando no computador. `local.properties` é opcional e só deve ser usado quando você quiser sobrescrever esse endereço.
 
+Para publicar a API e distribuir o APK para uso público, o caminho recomendado é Render + MongoDB Atlas. Depois do deploy da API, gere o app apontando para a URL pública:
+
+```powershell
+.\gradlew.bat assembleRelease -PapiBaseUrl=https://SEU-SERVICO.onrender.com/ -PsignalrHubUrl=https://SEU-SERVICO.onrender.com/chat
+```
+
 Para testar em um celular físico na mesma rede Wi-Fi:
 - suba a API com o perfil de rede local:
   `dotnet run --project WtcConnect.Api --launch-profile lan-http`

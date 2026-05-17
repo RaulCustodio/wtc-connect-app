@@ -87,6 +87,66 @@ O hub SignalR fica em:
 dotnet build .\WtcConnect.Api\WtcConnect.Api.csproj -c Release
 ```
 
+## Publicar no Render
+
+O repositório já inclui [render.yaml](c:/Users/raulc/source/repos/wtc-connect-app/render.yaml) e [Dockerfile](c:/Users/raulc/source/repos/wtc-connect-app/WtcConnect.Api/Dockerfile) para criar um Web Service Docker no Render.
+
+### Passo a passo
+
+1. Envie as alterações para o GitHub.
+2. No Render, clique em `New +` > `Web Service`.
+3. Selecione este repositório.
+4. Como o seu painel não oferece runtime `.NET`, mantenha `Language = Docker`.
+5. Preencha os campos assim:
+
+```text
+Name: wtc-connect-api
+Branch: main
+Root Directory: (deixe vazio)
+Docker Build Context Directory: .
+Dockerfile Path: ./WtcConnect.Api/Dockerfile
+Docker Command: (deixe vazio)
+Pre-Deploy Command: (deixe vazio)
+```
+
+6. No painel do serviço, configure as variáveis sensíveis:
+
+```text
+ASPNETCORE_ENVIRONMENT=Production
+Jwt__Key=<uma-chave-forte-com-32-ou-mais-caracteres>
+MongoDbSettings__ConnectionString=<sua-string-do-mongodb-atlas>
+MongoDbSettings__DatabaseName=wtc_connect
+```
+
+7. Faça o deploy.
+8. Quando o Render fornecer a URL pública, valide:
+
+```text
+https://SEU-SERVICO.onrender.com/
+https://SEU-SERVICO.onrender.com/chat
+```
+
+### Observações para produção
+
+- O Render termina o HTTPS no proxy; a API já está preparada para `X-Forwarded-Proto`.
+- O SignalR continua no endpoint `/chat` e funciona no Render via WebSockets.
+- Se o MongoDB Atlas tiver whitelist por IP, libere o acesso do Render ao cluster.
+- Não deixe a connection string do Atlas como segredo versionado para produção pública.
+
+## Gerar APK apontando para a API publicada
+
+Depois de publicar a API no Render, gere o app apontando para a URL pública:
+
+```powershell
+.\gradlew.bat assembleRelease -PapiBaseUrl=https://SEU-SERVICO.onrender.com/ -PsignalrHubUrl=https://SEU-SERVICO.onrender.com/chat
+```
+
+Para um teste rápido antes do APK final:
+
+```powershell
+.\gradlew.bat assembleDebug -PapiBaseUrl=https://SEU-SERVICO.onrender.com/ -PsignalrHubUrl=https://SEU-SERVICO.onrender.com/chat
+```
+
 ## Observabilidade e auditoria
 
 - Logs HTTP de entrada e saída com `traceId`

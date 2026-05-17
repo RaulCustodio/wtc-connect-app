@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: wtc-connect-api
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ./WtcConnect.Api/Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Jwt__Key
+        sync: false
+      - key: MongoDbSettings__ConnectionString
+        sync: false
+      - key: MongoDbSettings__DatabaseName
+        value: wtc_connect
