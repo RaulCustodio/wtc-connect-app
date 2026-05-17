@@ -7,7 +7,7 @@ RUN dotnet restore WtcConnect.Api/WtcConnect.Api.csproj
 COPY WtcConnect.Api/. WtcConnect.Api/
 
 WORKDIR /src/WtcConnect.Api
-RUN dotnet publish WtcConnect.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app

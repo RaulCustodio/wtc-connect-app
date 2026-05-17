@@ -1,12 +1,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-COPY WtcConnect.Api/WtcConnect.Api.csproj WtcConnect.Api/
-RUN dotnet restore WtcConnect.Api/WtcConnect.Api.csproj
+COPY WtcConnect.Api.csproj .
+RUN dotnet restore WtcConnect.Api.csproj
 
-COPY WtcConnect.Api/. WtcConnect.Api/
+COPY . .
 
-WORKDIR /src/WtcConnect.Api
+WORKDIR /src
 RUN dotnet publish WtcConnect.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
