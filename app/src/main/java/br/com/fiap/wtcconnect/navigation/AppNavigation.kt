@@ -25,6 +25,7 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
     val authState = authViewModel.authState.collectAsState()
+    val pendingChatLink = DeepLinkManager.pendingChatLink.collectAsState()
 
     // Determine starting destination based on authentication state
     val startDestination = if (authState.value.isAuthenticated) {
@@ -88,11 +89,11 @@ fun AppNavigation() {
             )
         }
         composable(Routes.MAIN) {
-            MainScreen(authViewModel = authViewModel)
+            MainScreen(authViewModel = authViewModel, pendingChatLink = pendingChatLink.value)
         }
         composable(Routes.OPERATOR) {
             // TODO: Implementar tela de operador quando necessário
-            MainScreen(authViewModel = authViewModel)
+            MainScreen(authViewModel = authViewModel, pendingChatLink = pendingChatLink.value)
         }
     }
 }

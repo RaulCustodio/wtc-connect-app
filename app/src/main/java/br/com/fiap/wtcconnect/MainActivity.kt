@@ -1,5 +1,6 @@
 package br.com.fiap.wtcconnect
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import br.com.fiap.wtcconnect.navigation.AppNavigation
+import br.com.fiap.wtcconnect.navigation.DeepLinkManager
 import br.com.fiap.wtcconnect.ui.theme.WtcCrmTheme
 
 class MainActivity : ComponentActivity() {
@@ -43,6 +45,7 @@ class MainActivity : ComponentActivity() {
         }
 
         AppContainer.init(applicationContext)
+        DeepLinkManager.update(intent?.data)
         setContent {
             WtcCrmTheme {
                 Surface(
@@ -53,6 +56,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        DeepLinkManager.update(intent.data)
     }
 }
 

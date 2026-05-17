@@ -35,10 +35,10 @@ class ChatViewModel(private val repository: ChatRepository, private val conversa
         }
     }
 
-    fun sendMessage(content: String) {
+    fun sendMessage(content: String, mediaUrl: String? = null, mediaType: String? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            val result = repository.sendMessage(conversationId, content, currentUserId)
+            val result = repository.sendMessage(conversationId, content, currentUserId, mediaUrl, mediaType)
             if (result.isSuccess) {
                 // o fluxo de mensagens já será atualizado pelo repositório
                 _uiState.value = _uiState.value.copy(isLoading = false, error = null)

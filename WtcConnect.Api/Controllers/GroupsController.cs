@@ -17,17 +17,20 @@ public class GroupsController : ControllerBase
     private readonly MessageService _messageService;
     private readonly UserService _userService;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly AuditService _auditService;
 
     public GroupsController(
         GroupService groupService,
         MessageService messageService,
         UserService userService,
-        IHubContext<ChatHub> hubContext)
+        IHubContext<ChatHub> hubContext,
+        AuditService auditService)
     {
         _groupService = groupService;
         _messageService = messageService;
         _userService = userService;
         _hubContext = hubContext;
+        _auditService = auditService;
     }
 
     [AllowAnonymous]
@@ -53,6 +56,7 @@ public class GroupsController : ControllerBase
         }
 
         var group = await _groupService.CreateAsync(request.Name.Trim());
+        _auditService.Log(HttpContext, "groups.create", "success", group.Id, group.Name);
         return Ok(group);
     }
 
@@ -113,6 +117,7 @@ public class GroupsController : ControllerBase
         }
 
         var member = await _groupService.AddMemberByEmailAsync(groupId, request.Email);
+        _auditService.Log(HttpContext, "groups.add_member", "success", groupId, request.Email);
         return Ok(member);
     }
 
@@ -125,6 +130,8 @@ public class GroupsController : ControllerBase
         {
             return NotFound(new { message = "Usuário não pertence a este grupo" });
         }
+
+        _auditService.Log(HttpContext, "groups.remove_member", "success", groupId, userId);
 
         return Ok(removed);
     }
@@ -146,9 +153,9 @@ public class GroupsController : ControllerBase
     [HttpPost("{groupId}/messages")]
     public async Task<IActionResult> SendMessage(string groupId, [FromBody] SendGroupMessageRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Content))
+        if (string.IsNullOrWhiteSpace(request.Content) && string.IsNullOrWhiteSpace(request.MediaUrl))
         {
-            return BadRequest(new { message = "Content é obrigatório" });
+            return BadRequest(new { message = "Envie texto ou mídia" });
         }
 
         var group = await _groupService.GetByIdAsync(groupId);
@@ -183,6 +190,8 @@ public class GroupsController : ControllerBase
             SenderId = senderId,
             SenderRole = User.FindFirst(ClaimTypes.Role)?.Value ?? "Client",
             Content = request.Content,
+            MediaUrl = request.MediaUrl,
+            MediaType = request.MediaType,
             Status = MessageStatus.Sent,
             CreatedAt = DateTime.UtcNow
         };
@@ -193,6 +202,8 @@ public class GroupsController : ControllerBase
             .Group(ChatHub.GetSignalRGroup(groupId))
             .SendAsync("messageReceived", message);
 
+        _auditService.Log(HttpContext, "groups.send_message", "success", groupId, message.Id);
+
         return Ok(message);
     }
 }
@@ -200,4 +211,6 @@ public class GroupsController : ControllerBase
 public class SendGroupMessageRequest
 {
     public string Content { get; set; } = string.Empty;
+    public string? MediaUrl { get; set; }
+    public string? MediaType { get; set; }
 }

@@ -75,16 +75,27 @@ class RemoteChatRepository(
         return flow.asStateFlow()
     }
 
-    override suspend fun sendMessage(conversationId: String, content: String, senderId: String): Result<Unit> {
+    override suspend fun sendMessage(
+        conversationId: String,
+        content: String,
+        senderId: String,
+        mediaUrl: String?,
+        mediaType: String?
+    ): Result<Unit> {
         return runCatching {
             val message = if (conversationId.startsWith("group_")) {
                 val groupId = conversationId.removePrefix("group_")
-                groupApi.sendGroupMessage(groupId, SendGroupMessageRequest(content = content))
+                groupApi.sendGroupMessage(
+                    groupId,
+                    SendGroupMessageRequest(content = content, mediaUrl = mediaUrl, mediaType = mediaType)
+                )
             } else {
                 messageApi.sendMessage(
                     SendMessageRequest(
                         customerId = conversationId,
-                        content = content
+                        content = content,
+                        mediaUrl = mediaUrl,
+                        mediaType = mediaType
                     )
                 )
             }.toDomain()
@@ -306,6 +317,8 @@ private fun MessageDto.toDomain(): Message {
         senderId = senderId,
         senderRole = senderRole,
         content = content,
+        mediaUrl = mediaUrl,
+        mediaType = mediaType,
         status = status,
         campaignId = campaignId,
         createdAt = createdAt.toEpochMillis(),

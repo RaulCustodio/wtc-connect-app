@@ -1,18 +1,25 @@
 package br.com.fiap.wtcconnect.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import br.com.fiap.wtcconnect.ui.theme.RoyalBlue
+import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.first
 
 /**
@@ -38,6 +46,7 @@ import kotlinx.coroutines.flow.first
 @Composable
 fun ChatScreen(navController: NavController, conversationId: String, peerUserId: String, repository: ChatRepository? = null, currentUserId: String? = null, currentUserType: br.com.fiap.wtcconnect.viewmodel.UserType = br.com.fiap.wtcconnect.viewmodel.UserType.CLIENT) {
     val repo = repository ?: FakeChatRepository(currentUserId = currentUserId ?: "me")
+    val context = LocalContext.current
     // Cria ViewModel com factory passando conversationId e currentUserId
     val effectiveUserId = currentUserId ?: "me"
     val vm: ChatViewModel = viewModel(factory = ChatViewModelFactory(repo, conversationId, effectiveUserId))
@@ -112,6 +121,8 @@ fun ChatScreen(navController: NavController, conversationId: String, peerUserId:
     }
 
     var input by remember { mutableStateOf("") }
+    var mediaUrlInput by remember { mutableStateOf("") }
+    var showMediaComposer by remember { mutableStateOf(false) }
 
     // Cache simples de usuários para exibir nome do remetente
     val userCache = remember { mutableStateMapOf<String, br.com.fiap.wtcconnect.data.User?>() }
@@ -187,7 +198,12 @@ fun ChatScreen(navController: NavController, conversationId: String, peerUserId:
                                      userCache[message.senderId]
                                  }
 
-                             MessageRow(message = message, isMe = isMe, senderName = senderName?.name)
+                             MessageRow(
+                                 message = message,
+                                 isMe = isMe,
+                                 senderName = senderName?.name,
+                                 onOpenMedia = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                             )
                          }
                      }
 
@@ -195,19 +211,36 @@ fun ChatScreen(navController: NavController, conversationId: String, peerUserId:
                     Row(modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = input,
-                            onValueChange = { input = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("Digite uma mensagem")
+                        Column(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = input,
+                                onValueChange = { input = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Digite uma mensagem") }
+                            )
+                            if (showMediaComposer) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = mediaUrlInput,
+                                    onValueChange = { mediaUrlInput = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    placeholder = { Text("Cole uma URL de imagem, vídeo ou arquivo") },
+                                    supportingText = { Text("A mídia é enviada como URL") }
+                                )
                             }
-                        )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { showMediaComposer = !showMediaComposer }) {
+                            Icon(imageVector = Icons.Filled.AttachFile, contentDescription = "Anexar mídia")
+                        }
                         IconButton(onClick = {
                             val content = input.trim()
-                            if (content.isNotEmpty()) {
-                                vm.sendMessage(content)
+                            val mediaUrl = mediaUrlInput.trim().takeIf { it.isNotEmpty() }
+                            if (content.isNotEmpty() || mediaUrl != null) {
+                                vm.sendMessage(content, mediaUrl = mediaUrl, mediaType = guessMediaType(mediaUrl))
                                 input = ""
+                                mediaUrlInput = ""
+                                showMediaComposer = false
                                 // A rolagem será tratada pelo LaunchedEffect que observa state.messages.size
                             }
                         }) {
@@ -221,7 +254,7 @@ fun ChatScreen(navController: NavController, conversationId: String, peerUserId:
 }
 
 @Composable
-fun MessageRow(message: Message, isMe: Boolean, senderName: String? = null) {
+fun MessageRow(message: Message, isMe: Boolean, senderName: String? = null, onOpenMedia: (String) -> Unit = {}) {
     // Layout de mensagem com avatar para mensagens recebidas
     val bg = if (isMe) RoyalBlue else Color(0xFFEFEFEF)
     if (isMe) {
@@ -231,7 +264,7 @@ fun MessageRow(message: Message, isMe: Boolean, senderName: String? = null) {
                 .padding(4.dp)
                 .background(bg, shape = RoundedCornerShape(8.dp))
                 .padding(8.dp)) {
-                Text(text = message.content, color = Color.White)
+                MessageBody(message = message, textColor = Color.White, onOpenMedia = onOpenMedia)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = formatTime(message.createdAt), fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.End))
             }
@@ -258,10 +291,63 @@ fun MessageRow(message: Message, isMe: Boolean, senderName: String? = null) {
                     Text(text = senderName, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
                     Spacer(modifier = Modifier.height(4.dp))
                 }
-                Text(text = message.content, color = Color.Black)
+                MessageBody(message = message, textColor = Color.Black, onOpenMedia = onOpenMedia)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = formatTime(message.createdAt), fontSize = 10.sp, color = Color.Gray)
             }
         }
+    }
+}
+
+@Composable
+private fun MessageBody(message: Message, textColor: Color, onOpenMedia: (String) -> Unit) {
+    if (message.content.isNotBlank()) {
+        Text(text = message.content, color = textColor)
+    }
+
+    message.mediaUrl?.let { url ->
+        if (message.content.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        when (message.mediaType) {
+            "image" -> {
+                AsyncImage(
+                    model = url,
+                    contentDescription = "Imagem anexada",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onOpenMedia(url) },
+                    contentScale = ContentScale.Crop
+                )
+            }
+
+            else -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = if (textColor == Color.White) 0.18f else 0.95f))
+                        .clickable { onOpenMedia(url) }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Abrir mídia", tint = textColor)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = url, color = textColor, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+private fun guessMediaType(mediaUrl: String?): String? {
+    val url = mediaUrl?.lowercase() ?: return null
+    return when {
+        url.endsWith(".png") || url.endsWith(".jpg") || url.endsWith(".jpeg") || url.endsWith(".gif") || url.endsWith(".webp") -> "image"
+        url.endsWith(".mp4") || url.endsWith(".mov") || url.endsWith(".avi") -> "video"
+        else -> "link"
     }
 }

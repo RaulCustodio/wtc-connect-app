@@ -1,34 +1,39 @@
 package br.com.fiap.wtcconnect.viewmodel
 
+import android.app.Application
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
-import com.google.firebase.auth.FirebaseUser
-import io.mockk.*
+import br.com.fiap.wtcconnect.AppContainer
+import br.com.fiap.wtcconnect.data.auth.AuthRepository
+import br.com.fiap.wtcconnect.data.auth.UserSession
+import br.com.fiap.wtcconnect.network.AuthResponse
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.runs
+import io.mockk.unmockkAll
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-
-/**
- * Testes Unitários para AuthViewModel
- *
- * Este arquivo demonstra como testar a lógica de autenticação
- *
- * Para usar, adicione ao build.gradle.kts:
- * testImplementation("junit:junit:4.13.2")
- * testImplementation("androidx.arch.core:core-testing:2.1.0")
- * testImplementation("io.mockk:mockk:1.13.7")
- * testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
- */
+import retrofit2.HttpException
+import retrofit2.Response
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthViewModelTest {
@@ -37,19 +42,21 @@ class AuthViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    private lateinit var mockFirebaseAuth: FirebaseAuth
-    private lateinit var mockFirebaseUser: FirebaseUser
+    private lateinit var application: Application
+    private lateinit var authRepository: AuthRepository
     private lateinit var authViewModel: AuthViewModel
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        mockFirebaseAuth = mockk(relaxed = true)
-        mockFirebaseUser = mockk(relaxed = true)
+        application = mockk(relaxed = true)
+        authRepository = mockk(relaxed = true)
 
-        // Mock de FirebaseAuth.getInstance()
-        mockkStatic(FirebaseAuth::class)
-        every { FirebaseAuth.getInstance() } returns mockFirebaseAuth
+        mockkObject(AppContainer)
+        every { AppContainer.init(any()) } just runs
+        every { AppContainer.provideAuthRepository() } returns authRepository
+        every { authRepository.getCurrentSession() } returns null
+        authViewModel = AuthViewModel(application)
     }
 
     @After
@@ -59,213 +66,124 @@ class AuthViewModelTest {
     }
 
     @Test
-    fun `testCheckCurrentUser_UserLoggedIn_ReturnsAuthenticatedState`() = runTest {
-        // Arrange
-        every { mockFirebaseUser.uid } returns "test_uid"
-        every { mockFirebaseUser.email } returns "test@email.com"
-        every { mockFirebaseAuth.currentUser } returns mockFirebaseUser
+    fun `restoreSession autentica usuario existente`() = runTest {
+        val session = UserSession(
+            token = "token-1",
+            userId = "user-1",
+            email = "cliente@wtc.com",
+            role = "Client"
+        )
+        every { authRepository.getCurrentSession() } returns session
 
-        // Act
-        authViewModel = AuthViewModel()
+        authViewModel = AuthViewModel(application)
 
-        // Assert
         val state = authViewModel.authState.first()
-        assert(state.isAuthenticated)
-        assert(state.userId == "test_uid")
-        assert(state.userEmail == "test@email.com")
+        assertTrue(state.isAuthenticated)
+        assertEquals("user-1", state.userId)
+        assertEquals("cliente@wtc.com", state.userEmail)
+        assertEquals(UserType.CLIENT, state.userType)
     }
 
     @Test
-    fun `testCheckCurrentUser_UserNotLoggedIn_ReturnsUnauthenticatedState`() = runTest {
-        // Arrange
-        every { mockFirebaseAuth.currentUser } returns null
-
-        // Act
-        authViewModel = AuthViewModel()
-
-        // Assert
-        val state = authViewModel.authState.first()
-        assert(!state.isAuthenticated)
-        assert(state.userId == null)
-        assert(state.userEmail == null)
-    }
-
-    @Test
-    fun `testLogin_EmptyEmail_ReturnsError`() = runTest {
-        // Arrange
-        authViewModel = AuthViewModel()
-
-        // Act
+    fun `login com campos vazios retorna erro local`() = runTest {
         authViewModel.login("", "password123", false)
 
-        // Assert
         val state = authViewModel.authState.first()
-        assert(!state.isAuthenticated)
-        assert(state.errorMessage == "Por favor, preencha todos os campos")
+        assertFalse(state.isAuthenticated)
+        assertEquals("Por favor, preencha todos os campos", state.errorMessage)
     }
 
     @Test
-    fun `testLogin_EmptyPassword_ReturnsError`() = runTest {
-        // Arrange
-        authViewModel = AuthViewModel()
-
-        // Act
-        authViewModel.login("test@email.com", "", false)
-
-        // Assert
-        val state = authViewModel.authState.first()
-        assert(!state.isAuthenticated)
-        assert(state.errorMessage == "Por favor, preencha todos os campos")
-    }
-
-    @Test
-    fun `testLogin_InvalidEmail_ReturnsError`() = runTest {
-        // Arrange
-        authViewModel = AuthViewModel()
-        val exception = FirebaseAuthInvalidCredentialsException(
-            "The email address is badly formatted.",
-            Throwable()
+    fun `login com sucesso autentica cliente`() = runTest {
+        coEvery { authRepository.login("cliente@wtc.com", "123456") } returns AuthResponse(
+            token = "token-1",
+            userId = "user-1",
+            email = "cliente@wtc.com",
+            role = "Client"
         )
-        val task = mockk<com.google.android.gms.tasks.Task<com.google.firebase.auth.AuthResult>>()
-        every { task.isSuccessful } returns false
-        every { task.exception } returns exception
-        every { task.addOnCompleteListener(any()) } answers {
-            val callback = firstArg<com.google.android.gms.tasks.OnCompleteListener<com.google.firebase.auth.AuthResult>>()
-            callback.onComplete(task)
-            task
-        }
-        every { mockFirebaseAuth.signInWithEmailAndPassword(any(), any()) } returns task
 
-        // Act
-        authViewModel.login("invalidemail", "password123", false)
+        authViewModel.login("cliente@wtc.com", "123456", false)
         advanceUntilIdle()
 
-        // Assert
         val state = authViewModel.authState.first()
-        assert(!state.isAuthenticated)
-        assert(state.errorMessage?.contains("Formato de e-mail inválido") == true)
+        assertTrue(state.isAuthenticated)
+        assertEquals(UserType.CLIENT, state.userType)
+        assertEquals("user-1", state.userId)
+        assertEquals("token-1", state.token)
+        assertNull(state.errorMessage)
     }
 
     @Test
-    fun `testLogin_UserNotFound_ReturnsError`() = runTest {
-        // Arrange
-        authViewModel = AuthViewModel()
-        val exception = FirebaseAuthInvalidUserException("There is no user record", Throwable())
-        val task = mockk<com.google.android.gms.tasks.Task<com.google.firebase.auth.AuthResult>>()
-        every { task.isSuccessful } returns false
-        every { task.exception } returns exception
-        every { task.addOnCompleteListener(any()) } answers {
-            val callback = firstArg<com.google.android.gms.tasks.OnCompleteListener<com.google.firebase.auth.AuthResult>>()
-            callback.onComplete(task)
-            task
-        }
-        every { mockFirebaseAuth.signInWithEmailAndPassword(any(), any()) } returns task
+    fun `login de operador com perfil client retorna erro`() = runTest {
+        coEvery { authRepository.login("cliente@wtc.com", "123456") } returns AuthResponse(
+            token = "token-1",
+            userId = "user-1",
+            email = "cliente@wtc.com",
+            role = "Client"
+        )
+        every { authRepository.logout() } just runs
 
-        // Act
-        authViewModel.login("notfound@email.com", "password123", false)
+        authViewModel.login("cliente@wtc.com", "123456", true)
         advanceUntilIdle()
 
-        // Assert
         val state = authViewModel.authState.first()
-        assert(!state.isAuthenticated)
-        assert(state.errorMessage?.contains("não encontrado") == true)
+        assertFalse(state.isAuthenticated)
+        assertEquals("Este usuário não possui perfil de operador", state.errorMessage)
+        verify { authRepository.logout() }
     }
 
     @Test
-    fun `testLogout_ClearsAuthState`() = runTest {
-        // Arrange
-        every { mockFirebaseAuth.currentUser } returns mockFirebaseUser
-        authViewModel = AuthViewModel()
+    fun `login com http 401 traduz mensagem da api`() = runTest {
+        val errorBody = "{\"message\":\"Credenciais inválidas\"}".toResponseBody("application/json".toMediaType())
+        coEvery { authRepository.login("user@wtc.com", "senha") } throws HttpException(
+            Response.error<Any>(401, errorBody)
+        )
 
-        var initialState = authViewModel.authState.first()
-        every { mockFirebaseAuth.signOut() } just Runs
-        every { mockFirebaseAuth.currentUser } returns null
+        authViewModel.login("user@wtc.com", "senha", false)
+        advanceUntilIdle()
 
-        // Act
+        val state = authViewModel.authState.first()
+        assertFalse(state.isAuthenticated)
+        assertEquals("Credenciais inválidas", state.errorMessage)
+    }
+
+    @Test
+    fun `logout limpa estado autenticado`() = runTest {
+        every { authRepository.getCurrentSession() } returns UserSession(
+            token = "token-1",
+            userId = "user-1",
+            email = "cliente@wtc.com",
+            role = "Client"
+        )
+        every { authRepository.logout() } just runs
+        authViewModel = AuthViewModel(application)
+
         authViewModel.logout()
 
-        // Assert
-        verify { mockFirebaseAuth.signOut() }
-        val finalState = authViewModel.authState.first()
-        assert(!finalState.isAuthenticated)
-        assert(finalState.userId == null)
-        assert(finalState.userEmail == null)
+        val state = authViewModel.authState.first()
+        assertFalse(state.isAuthenticated)
+        assertNull(state.userId)
+        assertNull(state.userEmail)
+        verify { authRepository.logout() }
     }
 
     @Test
-    fun `testClearError_RemovesErrorMessage`() = runTest {
-        // Arrange
-        authViewModel = AuthViewModel()
-        // Simular um erro
+    fun `clearError remove mensagem atual`() = runTest {
         authViewModel.login("", "password", false)
+        assertEquals("Por favor, preencha todos os campos", authViewModel.authState.first().errorMessage)
 
-        var state = authViewModel.authState.first()
-        assert(state.errorMessage != null)
-
-        // Act
         authViewModel.clearError()
 
-        // Assert
-        state = authViewModel.authState.first()
-        assert(state.errorMessage == null)
+        assertNull(authViewModel.authState.first().errorMessage)
     }
 
     @Test
-    fun `testLogin_ClientType_SetsUserTypeToClient`() = runTest {
-        // Arrange
-        authViewModel = AuthViewModel()
-        every { mockFirebaseUser.uid } returns "test_uid"
-        every { mockFirebaseUser.email } returns "client@email.com"
-        val authResult = mockk<com.google.firebase.auth.AuthResult>()
-        every { authResult.user } returns mockFirebaseUser
-        val task = mockk<com.google.android.gms.tasks.Task<com.google.firebase.auth.AuthResult>>()
-        every { task.isSuccessful } returns true
-        every { task.result } returns authResult
-        every { task.addOnCompleteListener(any()) } answers {
-            val callback = firstArg<com.google.android.gms.tasks.OnCompleteListener<com.google.firebase.auth.AuthResult>>()
-            callback.onComplete(task)
-            task
-        }
-        every { mockFirebaseAuth.signInWithEmailAndPassword(any(), any()) } returns task
-        every { mockFirebaseAuth.currentUser } returns mockFirebaseUser
+    fun `register com campos vazios retorna erro local`() = runTest {
+        authViewModel.register("", "123456", "123456", false)
 
-        // Act
-        authViewModel.login("client@email.com", "password123", false)
-        advanceUntilIdle()
-
-        // Assert
         val state = authViewModel.authState.first()
-        assert(state.isAuthenticated)
-        assert(state.userType == UserType.CLIENT)
-    }
-
-    @Test
-    fun `testLogin_OperatorType_SetsUserTypeToOperator`() = runTest {
-        // Arrange
-        authViewModel = AuthViewModel()
-        every { mockFirebaseUser.uid } returns "operator_uid"
-        every { mockFirebaseUser.email } returns "operator@email.com"
-        val authResult = mockk<com.google.firebase.auth.AuthResult>()
-        every { authResult.user } returns mockFirebaseUser
-        val task = mockk<com.google.android.gms.tasks.Task<com.google.firebase.auth.AuthResult>>()
-        every { task.isSuccessful } returns true
-        every { task.result } returns authResult
-        every { task.addOnCompleteListener(any()) } answers {
-            val callback = firstArg<com.google.android.gms.tasks.OnCompleteListener<com.google.firebase.auth.AuthResult>>()
-            callback.onComplete(task)
-            task
-        }
-        every { mockFirebaseAuth.signInWithEmailAndPassword(any(), any()) } returns task
-        every { mockFirebaseAuth.currentUser } returns mockFirebaseUser
-
-        // Act
-        authViewModel.login("operator@email.com", "password123", true)
-        advanceUntilIdle()
-
-        // Assert
-        val state = authViewModel.authState.first()
-        assert(state.isAuthenticated)
-        assert(state.userType == UserType.OPERATOR)
+        assertFalse(state.isAuthenticated)
+        assertEquals("Por favor, preencha todos os campos", state.errorMessage)
     }
 }
 

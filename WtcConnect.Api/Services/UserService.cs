@@ -27,4 +27,13 @@ public class UserService
             .Find(u => u.Email == email)
             .FirstOrDefaultAsync();
     }
+
+    public async Task UpdatePasswordHashAsync(string userId, string passwordHash)
+    {
+        await _users.UpdateOneAsync(
+            user => user.Id == userId,
+            Builders<User>.Update
+                .Set(user => user.PasswordHash, passwordHash)
+                .Set(user => user.Password, null));
+    }
 }

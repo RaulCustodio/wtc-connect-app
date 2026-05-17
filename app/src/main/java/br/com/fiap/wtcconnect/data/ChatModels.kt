@@ -25,6 +25,8 @@ data class Message(
     val senderId: String,
     val senderRole: String = "Client",
     val content: String,
+    val mediaUrl: String? = null,
+    val mediaType: String? = null,
     val status: MessageStatus = MessageStatus.Sent,
     val campaignId: String? = null,
     val createdAt: Long,

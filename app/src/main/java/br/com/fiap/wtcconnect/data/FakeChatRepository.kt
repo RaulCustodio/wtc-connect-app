@@ -127,7 +127,13 @@ class FakeChatRepository(private val currentUserId: String = "me", private val c
         return flow
     }
 
-    override suspend fun sendMessage(conversationId: String, content: String, senderId: String): Result<Unit> {
+    override suspend fun sendMessage(
+        conversationId: String,
+        content: String,
+        senderId: String,
+        mediaUrl: String?,
+        mediaType: String?
+    ): Result<Unit> {
         // Simula atraso de rede e adiciona a mensagem localmente
         val now = System.currentTimeMillis()
         val msg = Message(
@@ -136,6 +142,8 @@ class FakeChatRepository(private val currentUserId: String = "me", private val c
             senderId = senderId,
             senderRole = "Client",
             content = content,
+            mediaUrl = mediaUrl,
+            mediaType = mediaType,
             status = MessageStatus.Delivered,
             createdAt = now,
             deliveredAt = now
@@ -149,7 +157,7 @@ class FakeChatRepository(private val currentUserId: String = "me", private val c
         // Para chats de grupo, se a conversa não existir na lista, não precisa criar uma entrada
         // pois grupos têm sua própria UI separada
         val updated = _conversations.value.map { conv ->
-            if (conv.id == conversationId) conv.copy(lastMessage = content, lastTimestamp = now, unreadCount = 0)
+            if (conv.id == conversationId) conv.copy(lastMessage = content.ifBlank { mediaType ?: "Mídia" }, lastTimestamp = now, unreadCount = 0)
             else conv
         }
 
@@ -165,7 +173,7 @@ class FakeChatRepository(private val currentUserId: String = "me", private val c
                     val groupConversation = Conversation(
                         id = conversationId,
                         peerUser = groupUser,
-                        lastMessage = content,
+                        lastMessage = content.ifBlank { mediaType ?: "Mídia" },
                         lastTimestamp = now,
                         unreadCount = 0
                     )

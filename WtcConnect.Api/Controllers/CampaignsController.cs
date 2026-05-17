@@ -16,15 +16,18 @@ public class CampaignsController : ControllerBase
     private readonly CampaignService _campaignService;
     private readonly MessageService _messageService;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly AuditService _auditService;
 
     public CampaignsController(
         CampaignService campaignService,
         MessageService messageService,
-        IHubContext<ChatHub> hubContext)
+        IHubContext<ChatHub> hubContext,
+        AuditService auditService)
     {
         _campaignService = campaignService;
         _messageService = messageService;
         _hubContext = hubContext;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -94,6 +97,8 @@ public class CampaignsController : ControllerBase
                 .Group(ChatHub.GetCustomerGroup(customerId))
                 .SendAsync("messageReceived", message);
         }
+
+        _auditService.Log(HttpContext, "campaigns.create", "success", campaign.Id, $"targets={customerIds.Count}");
 
         return Ok(new
         {

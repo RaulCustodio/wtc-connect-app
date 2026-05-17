@@ -15,11 +15,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import br.com.fiap.wtcconnect.AppContainer
+import br.com.fiap.wtcconnect.navigation.ChatDeepLink
+import br.com.fiap.wtcconnect.navigation.DeepLinkManager
 import br.com.fiap.wtcconnect.screens.campaigns.CampaignsScreen
 import br.com.fiap.wtcconnect.screens.ChatScreen
 import br.com.fiap.wtcconnect.screens.ConversationListScreen
@@ -46,10 +50,18 @@ sealed class BottomNavItem(val route: String, val icon: ImageVector, val label: 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(authViewModel: AuthViewModel) {
+fun MainScreen(authViewModel: AuthViewModel, pendingChatLink: ChatDeepLink? = null) {
     val navController = rememberNavController()
     val authState by authViewModel.authState.collectAsState()
     val isOperator = authState.userType == UserType.OPERATOR
+
+    LaunchedEffect(pendingChatLink) {
+        val link = pendingChatLink ?: return@LaunchedEffect
+        navController.navigate("chat/${link.conversationId}/${link.peerUserId}") {
+            launchSingleTop = true
+        }
+        DeepLinkManager.consume()
+    }
 
     val items = mutableListOf(
         BottomNavItem.Chat,
@@ -120,7 +132,13 @@ fun NavigationGraph(navController: androidx.navigation.NavHostController, authVi
         composable(BottomNavItem.Chat.route) {
             ConversationListScreen(navController = navController, repository = remoteChatRepo, currentUserId = authState.userId, currentUserType = authState.userType)
         }
-        composable("chat/{conversationId}/{peerUserId}") { backStackEntry ->
+        composable(
+            route = "chat/{conversationId}/{peerUserId}",
+            arguments = listOf(
+                navArgument("conversationId") { type = NavType.StringType },
+                navArgument("peerUserId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
             val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
             val peerUserId = backStackEntry.arguments?.getString("peerUserId") ?: ""
             ChatScreen(navController = navController, conversationId = conversationId, peerUserId = peerUserId, repository = remoteChatRepo, currentUserId = authState.userId, currentUserType = authState.userType)

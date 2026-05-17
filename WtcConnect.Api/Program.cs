@@ -12,8 +12,54 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var baseConfiguration = new ConfigurationBuilder()
+    .SetBasePath(builder.Environment.ContentRootPath)
+    .AddJsonFile("appsettings.json", optional: true)
+    .Build();
+
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        jwtKey = "wtc-connect-development-jwt-key-2026-local-only";
+        builder.Configuration["Jwt:Key"] = jwtKey;
+        Console.WriteLine(
+            "[Startup] Jwt:Key não foi configurada. Usando chave local de desenvolvimento. Configure Jwt__Key para ambientes compartilhados.");
+    }
+    else
+    {
+        throw new InvalidOperationException("Configure Jwt:Key via appsettings local ou variável de ambiente antes de iniciar a API.");
+    }
+}
+
+var mongoConnectionString = builder.Configuration["MongoDbSettings:ConnectionString"];
+if (string.IsNullOrWhiteSpace(mongoConnectionString) || mongoConnectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+{
+    mongoConnectionString = baseConfiguration["MongoDbSettings:ConnectionString"];
+}
+
+if (string.IsNullOrWhiteSpace(mongoConnectionString) || mongoConnectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("Configure MongoDbSettings:ConnectionString via appsettings local ou variável de ambiente antes de iniciar a API.");
+}
+
+var mongoDatabaseName = builder.Configuration["MongoDbSettings:DatabaseName"];
+if (string.IsNullOrWhiteSpace(mongoDatabaseName) || mongoDatabaseName.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+{
+    mongoDatabaseName = baseConfiguration["MongoDbSettings:DatabaseName"];
+}
+
+if (string.IsNullOrWhiteSpace(mongoDatabaseName))
+{
+    mongoDatabaseName = "wtc_connect";
+}
+
+builder.Configuration["MongoDbSettings:ConnectionString"] = mongoConnectionString;
+builder.Configuration["MongoDbSettings:DatabaseName"] = mongoDatabaseName;
 
 // Config Mongo (appsettings.json)
 builder.Services.Configure<MongoDbSettings>(
@@ -32,6 +78,8 @@ builder.Services.AddSingleton<IMongoClient>(sp =>
 // Services
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<UserService>();
+builder.Services.AddSingleton<PasswordHasherService>();
+builder.Services.AddSingleton<AuditService>();
 builder.Services.AddSingleton<MessageService>();
 builder.Services.AddSingleton<CampaignService>();
 builder.Services.AddSingleton<CustomerService>();
@@ -40,7 +88,7 @@ builder.Services.AddSingleton<GroupService>();
 builder.Services.AddSignalR();
 
 // CONFIG JWT 
-var key = Encoding.UTF8.GetBytes("wtc-connect-chave-super-secreta-123456");
+var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -116,6 +164,14 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("RequestAudit");
+    logger.LogInformation("HTTP {Method} {Path} traceId={TraceId}", context.Request.Method, context.Request.Path, context.TraceIdentifier);
+    await next();
+    logger.LogInformation("HTTP {Method} {Path} status={StatusCode} traceId={TraceId}", context.Request.Method, context.Request.Path, context.Response.StatusCode, context.TraceIdentifier);
+});
 
 // Swagger (SEMPRE ATIVO)
 app.UseSwagger();

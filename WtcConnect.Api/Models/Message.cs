@@ -20,6 +20,8 @@ public class Message
     public string SenderId { get; set; } = string.Empty;
     public string SenderRole { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    public string? MediaUrl { get; set; }
+    public string? MediaType { get; set; }
 
     [BsonRepresentation(BsonType.String)]
     public MessageStatus Status { get; set; } = MessageStatus.Sent;

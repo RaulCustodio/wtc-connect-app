@@ -28,7 +28,9 @@ data class AuthResponse(
 data class SendMessageRequest(
     val customerId: String,
     val content: String,
-    val campaignId: String? = null
+    val campaignId: String? = null,
+    val mediaUrl: String? = null,
+    val mediaType: String? = null
 )
 
 data class UpdateMessageStatusRequest(
@@ -41,6 +43,8 @@ data class MessageDto(
     val senderId: String = "",
     val senderRole: String = "",
     val content: String = "",
+    val mediaUrl: String? = null,
+    val mediaType: String? = null,
     val status: MessageStatus = MessageStatus.Sent,
     val campaignId: String? = null,
     val createdAt: String = "",
@@ -113,7 +117,9 @@ data class UserGroupResponse(
 )
 
 data class SendGroupMessageRequest(
-    val content: String
+    val content: String,
+    val mediaUrl: String? = null,
+    val mediaType: String? = null
 )
 
 interface AuthApi {

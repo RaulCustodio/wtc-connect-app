@@ -7,7 +7,13 @@ import kotlinx.coroutines.flow.Flow
 interface ChatRepository {
     fun getConversations(): Flow<List<Conversation>>
     fun getMessages(conversationId: String): Flow<List<Message>>
-    suspend fun sendMessage(conversationId: String, content: String, senderId: String): Result<Unit>
+    suspend fun sendMessage(
+        conversationId: String,
+        content: String,
+        senderId: String,
+        mediaUrl: String? = null,
+        mediaType: String? = null
+    ): Result<Unit>
 
     // Novas APIs para grupos
     fun getGroups(): Flow<List<Group>>
