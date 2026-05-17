@@ -9,7 +9,8 @@ WTC Connect é um cliente Android de mensagens integrado ao CRM corporativo. Sup
 - Android SDK (instale via Android Studio)
 - Git
 - .NET SDK 8
-- Docker Desktop com Docker Compose ou uma instância local do MongoDB
+- Acesso à internet para a API alcançar o MongoDB Atlas
+- Docker Desktop com Docker Compose ou uma instância local do MongoDB apenas se você quiser usar um banco local opcional
 
 ## Clonar repositório
 git clone https://github.com/CyntiaHagers/wtc-connect-app.git
@@ -19,12 +20,38 @@ cd wtc-connect-app
 - app/ — módulo da aplicação Android
 - app/src/main/java/br/com/fiap/wtcconnect/... — fontes Kotlin
 - WtcConnect.Api/ — backend ASP.NET Core 8
-- docker-compose.yml — MongoDB local para desenvolvimento e avaliação
+- docker-compose.yml — opção alternativa para MongoDB local, caso você não queira usar o Atlas
 
 ## Firebase
 O app ainda possui dependências Firebase para analytics e notificações, mas `app/google-services.json` não é necessário para o fluxo principal de avaliação local com API própria. O professor pode clonar, compilar e testar autenticação, chat, grupos, campanhas, mídia e deeplinks sem configurar Firebase.
 
-## Bootstrap reproduzível
+## Bootstrap padrão
+
+O fluxo padrão do projeto usa:
+
+- app Android local
+- API ASP.NET Core local
+- MongoDB Atlas remoto
+
+Passo a passo:
+
+1. Suba a API:
+
+```powershell
+dotnet run --project .\WtcConnect.Api\WtcConnect.Api.csproj
+```
+
+2. Instale o app no emulador Android:
+
+```powershell
+.\gradlew.bat installDebug
+```
+
+3. Abra o app no emulador. O build cai por padrão em `http://10.0.2.2:5281/`, então o app conversa com a API local sem precisar de `local.properties`.
+
+## Banco local opcional
+
+Se você não quiser usar o MongoDB Atlas, pode subir um Mongo local com Docker Compose:
 
 1. Suba o MongoDB local:
 
@@ -32,19 +59,26 @@ O app ainda possui dependências Firebase para analytics e notificações, mas `
 docker compose up -d
 ```
 
-2. Suba a API:
+2. No mesmo terminal, sobrescreva a configuração da API para o Mongo local:
+
+```powershell
+$env:MongoDbSettings__ConnectionString = "mongodb://localhost:27017"
+$env:MongoDbSettings__DatabaseName = "wtc_connect"
+```
+
+3. Suba a API:
 
 ```powershell
 dotnet run --project .\WtcConnect.Api\WtcConnect.Api.csproj
 ```
 
-3. Instale o app no emulador Android:
+4. Instale o app no emulador Android:
 
 ```powershell
 .\gradlew.bat installDebug
 ```
 
-4. Abra o app no emulador. O build cai por padrão em `http://10.0.2.2:5281/`, então o app conversa com a API local sem precisar de `local.properties`.
+5. Abra o app no emulador. O build cai por padrão em `http://10.0.2.2:5281/`, então o app conversa com a API local sem precisar de `local.properties`.
 
 ## Como construir e rodar
 - Abra o projeto no Android Studio e aguarde o Gradle sync.

@@ -21,15 +21,19 @@ API ASP.NET Core 8 para autenticação, cadastro de clientes, segmentos, campanh
 ## Pré-requisitos
 
 - .NET SDK 8
-- Docker Desktop com Docker Compose ou MongoDB local em `mongodb://localhost:27017`
+- Acesso à internet para alcançar o MongoDB Atlas configurado no projeto
+- Docker Desktop com Docker Compose ou MongoDB local em `mongodb://localhost:27017` apenas se você quiser rodar sem Atlas
 
 ## Configuração
 
-Para desenvolvimento e avaliação local, o projeto já cai por padrão em:
+Por padrão, o projeto usa o MongoDB Atlas configurado em `appsettings.json`.
+
+Para desenvolvimento e avaliação local, o projeto também já cai por padrão em:
 
 - JWT local de desenvolvimento, se `Jwt:Key` não estiver configurada
-- MongoDB local em `mongodb://localhost:27017`
 - banco `wtc_connect`
+
+O Mongo local em `mongodb://localhost:27017` é apenas um fallback opcional quando `MongoDbSettings:ConnectionString` não está configurada ou foi sobrescrita com placeholder no ambiente de desenvolvimento.
 
 Se quiser sobrescrever esses valores, configure as variáveis abaixo no PowerShell:
 
@@ -43,10 +47,24 @@ Opcionalmente, você pode definir os mesmos valores via User Secrets ou no perfi
 
 ## Bootstrap rápido
 
-Se você tiver Docker Desktop instalado, suba o MongoDB com:
+Fluxo padrão com Atlas:
+
+```powershell
+dotnet run --project .\WtcConnect.Api\WtcConnect.Api.csproj
+```
+
+Fluxo alternativo com Mongo local: se você tiver Docker Desktop instalado, suba o MongoDB com:
 
 ```powershell
 docker compose up -d
+```
+
+Depois sobrescreva a connection string para o banco local:
+
+```powershell
+$env:MongoDbSettings__ConnectionString = "mongodb://localhost:27017"
+$env:MongoDbSettings__DatabaseName = "wtc_connect"
+dotnet run --project .\WtcConnect.Api\WtcConnect.Api.csproj
 ```
 
 ## Executar
@@ -79,7 +97,7 @@ dotnet build .\WtcConnect.Api\WtcConnect.Api.csproj -c Release
 
 O app consome esta API via Retrofit e usa o hub `/chat` para mensagens em tempo real. Para emulador Android, o endereço padrão do app é `http://10.0.2.2:5281/`.
 
-O professor pode validar o fluxo local com:
+O professor pode validar o fluxo local com o setup padrão Atlas usando:
 
 ```powershell
 dotnet run --project .\WtcConnect.Api\WtcConnect.Api.csproj
