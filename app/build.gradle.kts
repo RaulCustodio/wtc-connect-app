@@ -22,7 +22,7 @@ val localProperties = Properties().apply {
 
 val apiBaseUrl = (localProperties.getProperty("api.base.url")
     ?: findProperty("apiBaseUrl")?.toString()
-    ?: "http://localhost:5281/")
+    ?: "http://10.0.2.2:5281/")
 
 val signalrHubUrl = (localProperties.getProperty("signalr.hub.url")
     ?: findProperty("signalrHubUrl")?.toString()

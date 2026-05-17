@@ -12,11 +12,6 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var baseConfiguration = new ConfigurationBuilder()
-    .SetBasePath(builder.Environment.ContentRootPath)
-    .AddJsonFile("appsettings.json", optional: true)
-    .Build();
-
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
@@ -39,7 +34,12 @@ if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Contains("CHANGE_ME", StringComp
 var mongoConnectionString = builder.Configuration["MongoDbSettings:ConnectionString"];
 if (string.IsNullOrWhiteSpace(mongoConnectionString) || mongoConnectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
 {
-    mongoConnectionString = baseConfiguration["MongoDbSettings:ConnectionString"];
+    if (builder.Environment.IsDevelopment())
+    {
+        mongoConnectionString = "mongodb://localhost:27017";
+        Console.WriteLine(
+            "[Startup] MongoDbSettings:ConnectionString não foi configurada. Usando Mongo local em mongodb://localhost:27017 para desenvolvimento.");
+    }
 }
 
 if (string.IsNullOrWhiteSpace(mongoConnectionString) || mongoConnectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
@@ -50,7 +50,7 @@ if (string.IsNullOrWhiteSpace(mongoConnectionString) || mongoConnectionString.Co
 var mongoDatabaseName = builder.Configuration["MongoDbSettings:DatabaseName"];
 if (string.IsNullOrWhiteSpace(mongoDatabaseName) || mongoDatabaseName.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
 {
-    mongoDatabaseName = baseConfiguration["MongoDbSettings:DatabaseName"];
+    mongoDatabaseName = "wtc_connect";
 }
 
 if (string.IsNullOrWhiteSpace(mongoDatabaseName))
