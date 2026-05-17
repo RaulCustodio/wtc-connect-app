@@ -24,3 +24,12 @@ WtcConnect.Api/obj/
 
 # Local machine configuration
 local.properties
+
+# Non-runtime project artifacts
+.claude/
+docs/
+submission/
+.env.render
+WhatsApp.conversas
+misc.xml
+modules.xml
